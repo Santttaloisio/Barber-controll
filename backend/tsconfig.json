@@ -9,7 +9,9 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+
+    "types": ["node", "express"]
   },
   "include": ["src"]
 }
