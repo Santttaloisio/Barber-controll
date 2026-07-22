@@ -4,7 +4,7 @@ exports.login = void 0;
 const jwt_1 = require("../utils/jwt");
 const getAuthConfig = () => {
     return {
-        username: process.env.AUTH_USERNAME ?? process.env.AUTH_EMAIL ?? 'Adminwest',
+        username: process.env.AUTH_USERNAME ?? 'Adminwest',
         password: process.env.AUTH_PASSWORD ?? 'admin123',
         name: process.env.AUTH_NAME ?? 'Administrador'
     };
