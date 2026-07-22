@@ -24,16 +24,17 @@ export const login = (req: Request, res: Response) => {
     return res.status(401).json({ message: 'Credenciales inválidas' })
   }
 
-  const user = {
-    username: auth.username,
-    name: auth.name
-  }
-
   const token = signToken({
     sub: auth.username,
     username: auth.username,
     name: auth.name
   })
 
-  return res.json({ token, user })
+  return res.json({
+    token,
+    user: {
+      username: auth.username,
+      name: auth.name
+    }
+  })
 }
