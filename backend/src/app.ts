@@ -20,6 +20,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
 
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200)
+  }
+  next()
+})
+
 app.use(express.json())
 
 app.use('/api/auth', authRoutes)
@@ -37,6 +44,7 @@ const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist))
+
   app.get('/', (_req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'))
   })
