@@ -40,6 +40,10 @@ app.use('/api/expenses', expenseRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/bootstrap', bootstrapRoutes)
 
+app.get('/api/ping', (_req, res) => {
+  res.json({ ok: true })
+})
+
 const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
 if (fs.existsSync(frontendDist)) {
