@@ -14,20 +14,23 @@ import { requireAuth } from './middlewares/auth.middleware'
 
 const app = express()
 
-// 🔥 CORS PRIMERO (IMPORTANTE)
+// ======================
+// CORS CONFIG (PROD + DEV)
+// ======================
 app.use(cors({
   origin: [
-    "http://localhost:5173",
-    "https://barber-control.vercel.app"
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://barber-control.vercel.app'
   ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }))
 
-// 🔥 PRE-FLIGHT HANDLER (ESTO TE FALTABA)
-app.options("*", cors())
-
+// ======================
+// MIDDLEWARES BASE
+// ======================
 app.use(express.json())
 
 // ======================
@@ -36,7 +39,7 @@ app.use(express.json())
 app.use('/api/auth', authRoutes)
 
 // ======================
-// PROTECT EVERYTHING BELOW
+// PROTECT API
 // ======================
 app.use('/api', requireAuth)
 
@@ -51,13 +54,14 @@ app.use('/api/reports', reportRoutes)
 app.use('/api/bootstrap', bootstrapRoutes)
 
 // ======================
-// FRONTEND STATIC (OPTIONAL)
+// FRONTEND (OPTIONAL RENDER HOST)
 // ======================
 const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist))
-  app.get(/.*/, (_req, res) => {
+
+  app.get('/*', (_req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'))
   })
 }
