@@ -9,9 +9,8 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": false,
 
-    "types": []
+    "types": ["node"]
   },
   "include": ["src"]
 }
