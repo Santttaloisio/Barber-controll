@@ -7,9 +7,7 @@ import type {
   Service
 } from '../types'
 
-const BASE_URL = import.meta.env.PROD
-  ? '/api'
-  : 'http://localhost:3000/api'
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
 const TOKEN_KEY = 'barber-control-token'
 const USER_KEY = 'barber-control-user'

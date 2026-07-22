@@ -16,12 +16,13 @@ En desarrollo, frontend y backend pueden correr separados:
 - Frontend: `http://localhost:5173`
 - Backend/API: `http://localhost:3000/api`
 
-En produccion, Express sirve tambien el build de Vite:
+En produccion recomendada:
 
-- App y API en un solo puerto
-- Frontend estatico desde `frontend/dist`
-- API en `/api/*`
-- Fallback SPA para rutas del frontend
+- Frontend en Vercel
+- Backend en Render
+- Supabase como base de datos
+
+El frontend usa `VITE_API_URL` para conectarse al backend publicado.
 
 ## Optimizacion Bootstrap
 
@@ -96,15 +97,65 @@ npm run dev
 
 ## Produccion
 
-Desde `backend`:
+### Backend en Render
+
+Root Directory:
+
+```txt
+backend
+```
+
+Build Command:
 
 ```bash
 npm install
 npm run build:full
+```
+
+Start Command:
+
+```bash
 npm start
 ```
 
-Esto compila el frontend y el backend. Luego Express sirve todo desde un solo puerto.
+Environment Variables en Render:
+
+```env
+SUPABASE_KEY=tu_supabase_key
+JWT_SECRET=una_clave_larga_y_privada
+AUTH_USERNAME=Adminwest
+AUTH_PASSWORD=admin123
+AUTH_NAME=Administrador
+PORT=3000
+```
+
+### Frontend en Vercel
+
+Root Directory:
+
+```txt
+frontend
+```
+
+Build Command:
+
+```bash
+npm run build
+```
+
+Output Directory:
+
+```txt
+dist
+```
+
+Environment Variables en Vercel:
+
+```env
+VITE_API_URL=https://tu-backend-en-render.onrender.com/api
+```
+
+Importante: `VITE_API_URL` debe incluir `/api` al final.
 
 ## Login
 
