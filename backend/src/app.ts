@@ -14,17 +14,35 @@ import { requireAuth } from './middlewares/auth.middleware'
 
 const app = express()
 
+// 🔥 CORS PRIMERO (IMPORTANTE)
 app.use(cors({
   origin: [
     "http://localhost:5173",
     "https://barber-control.vercel.app"
   ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }))
+
+// 🔥 PRE-FLIGHT HANDLER (ESTO TE FALTABA)
+app.options("*", cors())
+
 app.use(express.json())
 
+// ======================
+// PUBLIC ROUTES
+// ======================
 app.use('/api/auth', authRoutes)
+
+// ======================
+// PROTECT EVERYTHING BELOW
+// ======================
 app.use('/api', requireAuth)
+
+// ======================
+// PRIVATE ROUTES
+// ======================
 app.use('/api/barbers', barberRoutes)
 app.use('/api/cuts', cutRoutes)
 app.use('/api/services', serviceRoutes)
@@ -32,6 +50,9 @@ app.use('/api/expenses', expenseRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/bootstrap', bootstrapRoutes)
 
+// ======================
+// FRONTEND STATIC (OPTIONAL)
+// ======================
 const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
 if (fs.existsSync(frontendDist)) {
