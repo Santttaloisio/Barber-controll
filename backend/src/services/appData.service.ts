@@ -1,301 +1,247 @@
 import { supabase } from '../db/supabase'
 
-const monthNames = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre'
-]
+/* =========================
+   TYPES BASE
+========================= */
 
-const CACHE_TTL_MS = 3000
+type BarberType = {
+  id: number
+  nombre?: string
+  name?: string
+  active?: boolean
+  activo?: boolean
+}
 
-let cache:
-  | {
-      expiresAt: number
-      data: AppData
-    }
-  | null = null
+type ServiceType = {
+  id: number
+  nombre?: string
+  name?: string
+  precioBase?: number
+  price?: number
+  precio_base?: number
+}
+
+type CutType = {
+  id: number
+  barberId: number
+  serviceId: number
+  monto?: number
+  amount?: number
+  price?: number
+  fecha?: string
+  date?: string
+  created_at?: string
+}
+
+type ExpenseType = {
+  id: number
+  categoria?: string
+  category?: string
+  descripcion?: string
+  description?: string
+  monto?: number
+  amount?: number
+  metodoPago?: string
+  paymentMethod?: string
+  payment_method?: string
+  fecha?: string
+  date?: string
+  created_at?: string
+}
 
 type AppData = {
   dashboard: any
   month: any
   year: any
   cuts: any[]
-  barbers: any[]
-  services: any[]
-  expenses: any[]
+  barbers: BarberType[]
+  services: ServiceType[]
+  expenses: ExpenseType[]
 }
+
+/* =========================
+   CACHE
+========================= */
+
+const CACHE_TTL_MS = 3000
+
+let cache: {
+  expiresAt: number
+  data: AppData
+} | null = null
+
+export const invalidateAppDataCache = () => {
+  cache = null
+}
+
+/* =========================
+   HELPERS
+========================= */
 
 const toNumber = (value: unknown) => Number(value ?? 0)
 
-const getDate = (item: any) => {
-  return new Date(item.fecha ?? item.date ?? item.created_at ?? Date.now())
-}
+const getDate = (item: any) =>
+  new Date(item.fecha ?? item.date ?? item.created_at ?? Date.now())
 
-const formatDateKey = (date: Date) => {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0')
-  ].join('-')
-}
+const sameDay = (date: Date, reference: Date) =>
+  date.getFullYear() === reference.getFullYear() &&
+  date.getMonth() === reference.getMonth() &&
+  date.getDate() === reference.getDate()
 
-const sameDay = (date: Date, reference: Date) => {
-  return date.getFullYear() === reference.getFullYear()
-    && date.getMonth() === reference.getMonth()
-    && date.getDate() === reference.getDate()
-}
+const sameMonth = (date: Date, reference: Date) =>
+  date.getFullYear() === reference.getFullYear() &&
+  date.getMonth() === reference.getMonth()
 
-const sameMonth = (date: Date, reference: Date) => {
-  return date.getFullYear() === reference.getFullYear()
-    && date.getMonth() === reference.getMonth()
-}
+/* =========================
+   NORMALIZERS
+========================= */
 
-const normalizeBarber = (barber: any) => ({
-  ...barber,
+const normalizeBarber = (barber: any): BarberType => ({
   id: Number(barber.id),
   nombre: barber.nombre ?? barber.name ?? 'Sin nombre',
-  activo: barber.activo ?? barber.active ?? true,
-  createdAt: barber.createdAt ?? barber.created_at,
-  updatedAt: barber.updatedAt ?? barber.updated_at
+  activo: barber.activo ?? barber.active ?? true
 })
 
-const normalizeService = (service: any) => ({
-  ...service,
+const normalizeService = (service: any): ServiceType => ({
   id: Number(service.id),
   nombre: service.nombre ?? service.name ?? 'Sin nombre',
-  precioBase: toNumber(service.precioBase ?? service.price ?? service.precio_base),
-  createdAt: service.createdAt ?? service.created_at,
-  updatedAt: service.updatedAt ?? service.updated_at
+  precioBase: toNumber(
+    service.precioBase ?? service.price ?? service.precio_base
+  )
 })
 
-const normalizeExpense = (expense: any) => ({
-  ...expense,
+const normalizeExpense = (expense: any): ExpenseType => ({
   id: Number(expense.id),
-  categoria: expense.categoria ?? expense.category ?? 'Gastos varios',
-  descripcion: expense.descripcion ?? expense.description ?? 'Sin descripcion',
+  categoria: expense.categoria ?? expense.category ?? 'Gastos',
+  descripcion: expense.descripcion ?? expense.description ?? '',
   monto: toNumber(expense.monto ?? expense.amount),
-  metodoPago: expense.metodoPago ?? expense.paymentMethod ?? expense.payment_method ?? 'Sin metodo',
-  fecha: expense.fecha ?? expense.date ?? expense.created_at ?? new Date().toISOString(),
-  observacion: expense.observacion ?? expense.observation ?? null,
-  createdAt: expense.createdAt ?? expense.created_at,
-  updatedAt: expense.updatedAt ?? expense.updated_at
+  metodoPago:
+    expense.metodoPago ??
+    expense.paymentMethod ??
+    expense.payment_method ??
+    'Sin metodo',
+  fecha: expense.fecha ?? expense.date ?? expense.created_at
 })
 
 const normalizeCut = (
-  cut: any,
-  barbersById: Map<number, any>,
-  servicesById: Map<number, any>
+  cut: CutType,
+  barbersById: Map<number, BarberType>,
+  servicesById: Map<number, ServiceType>
 ) => {
-  const barberId = Number(cut.barberId ?? cut.barber_id ?? 0)
-  const serviceId = Number(cut.serviceId ?? cut.service_id ?? 0)
-  const barber = barbersById.get(barberId)
-  const service = servicesById.get(serviceId)
+  const barberId = Number(cut.barberId)
+  const serviceId = Number(cut.serviceId)
 
   return {
-    ...cut,
     id: Number(cut.id),
     barberId,
     serviceId,
     monto: toNumber(cut.monto ?? cut.amount ?? cut.price),
-    metodoPago: cut.metodoPago ?? cut.paymentMethod ?? cut.payment_method ?? 'Sin metodo',
-    observacion: cut.observacion ?? cut.observation ?? null,
-    fecha: cut.fecha ?? cut.date ?? cut.created_at ?? new Date().toISOString(),
-    Barber: barber,
-    Service: service,
-    createdAt: cut.createdAt ?? cut.created_at,
-    updatedAt: cut.updatedAt ?? cut.updated_at
+    metodoPago: 'Sin metodo',
+    fecha: cut.fecha ?? cut.date ?? cut.created_at,
+    Barber: barbersById.get(barberId),
+    Service: servicesById.get(serviceId)
   }
 }
 
-const sumCuts = (cuts: any[]) => {
-  return cuts.reduce((total, cut) => total + toNumber(cut.monto), 0)
-}
+/* =========================
+   SUMS
+========================= */
 
-const sumExpenses = (expenses: any[]) => {
-  return expenses.reduce((total, expense) => total + toNumber(expense.monto), 0)
-}
+const sumCuts = (cuts: any[]) =>
+  cuts.reduce((t, c) => t + toNumber(c.monto), 0)
 
-const groupPaymentMethods = (cuts: any[]) => {
-  const grouped = new Map<string, { metodoPago: string, cortes: number, facturacion: number }>()
+const sumExpenses = (expenses: any[]) =>
+  expenses.reduce((t, e) => t + toNumber(e.monto), 0)
 
-  cuts.forEach((cut) => {
-    const metodoPago = cut.metodoPago ?? 'Sin metodo'
-    const current = grouped.get(metodoPago) ?? { metodoPago, cortes: 0, facturacion: 0 }
+/* =========================
+   DASHBOARD
+========================= */
 
-    current.cortes += 1
-    current.facturacion += toNumber(cut.monto)
-    grouped.set(metodoPago, current)
-  })
-
-  return Array.from(grouped.values())
-}
-
-const buildDashboard = (cuts: any[], expenses: any[], barbers: any[]) => {
+const buildDashboard = (
+  cuts: any[],
+  expenses: ExpenseType[],
+  barbers: BarberType[]
+) => {
   const now = new Date()
-  const todayCuts = cuts.filter((cut) => sameDay(getDate(cut), now))
-  const monthCuts = cuts.filter((cut) => sameMonth(getDate(cut), now))
-  const monthExpenses = expenses.filter((expense) => sameMonth(getDate(expense), now))
-  const barbersById = new Map(barbers.map((barber) => [barber.id, barber]))
 
-  const barberBilling = new Map<number, {
-    barberId: number
-    nombre: string
-    cortes: number
-    facturacion: number
-  }>()
+  const todayCuts = cuts.filter((c) => sameDay(getDate(c), now))
+  const monthCuts = cuts.filter((c) => sameMonth(getDate(c), now))
+  const monthExpenses = expenses.filter((e) => sameMonth(getDate(e), now))
+
+  const barbersById = new Map<number, BarberType>(
+    barbers.map((b) => [b.id, b])
+  )
+
+  const servicesById = new Map<number, ServiceType>()
+
+  const barberStats = new Map<
+    number,
+    { barberId: number; nombre: string; cortes: number; facturacion: number }
+  >()
 
   monthCuts.forEach((cut) => {
-    const current = barberBilling.get(cut.barberId) ?? {
+    const current = barberStats.get(cut.barberId) ?? {
       barberId: cut.barberId,
       nombre: barbersById.get(cut.barberId)?.nombre ?? 'Sin nombre',
       cortes: 0,
       facturacion: 0
     }
 
-    current.cortes += 1
+    current.cortes++
     current.facturacion += toNumber(cut.monto)
-    barberBilling.set(cut.barberId, current)
+
+    barberStats.set(cut.barberId, current)
   })
-
-  const expensesByCategory = new Map<string, {
-    categoria: string
-    cantidad: number
-    total: number
-  }>()
-
-  monthExpenses.forEach((expense) => {
-    const current = expensesByCategory.get(expense.categoria) ?? {
-      categoria: expense.categoria,
-      cantidad: 0,
-      total: 0
-    }
-
-    current.cantidad += 1
-    current.total += toNumber(expense.monto)
-    expensesByCategory.set(expense.categoria, current)
-  })
-
-  const monthRevenue = sumCuts(monthCuts)
-  const monthExpenseTotal = sumExpenses(monthExpenses)
 
   return {
     hoy: {
       cortes: todayCuts.length,
-      facturacion: sumCuts(todayCuts),
-      porMetodoPago: groupPaymentMethods(todayCuts),
-      detalle: todayCuts.map((cut) => ({
-        id: cut.id,
-        barberId: cut.barberId,
-        nombreBarbero: cut.Barber?.nombre ?? 'Sin nombre',
-        monto: cut.monto,
-        metodoPago: cut.metodoPago,
-        fecha: cut.fecha
-      }))
+      facturacion: sumCuts(todayCuts)
     },
     mes: {
       cortes: monthCuts.length,
-      facturacion: monthRevenue,
-      porMetodoPago: groupPaymentMethods(monthCuts),
-      gananciaEstimada: monthRevenue - monthExpenseTotal,
-      gastosPorCategoria: Array.from(expensesByCategory.values()),
-      gastos: monthExpenseTotal
+      facturacion: sumCuts(monthCuts),
+      gastos: sumExpenses(monthExpenses),
+      gananciaEstimada: sumCuts(monthCuts) - sumExpenses(monthExpenses)
     },
-    facturacionPorBarbero: Array.from(barberBilling.values())
+    facturacionPorBarbero: Array.from(barberStats.values())
   }
 }
 
-const buildMonthReport = (cuts: any[], reference = new Date()) => {
-  const month = reference.getMonth() + 1
-  const year = reference.getFullYear()
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const monthCuts = cuts.filter((cut) => sameMonth(getDate(cut), reference))
-
-  const porDia = Array.from({ length: daysInMonth }, (_, index) => {
-    const day = index + 1
-    const dayKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    const dayCuts = monthCuts.filter((cut) => formatDateKey(getDate(cut)) === dayKey)
-
-    return {
-      fecha: dayKey,
-      cortes: dayCuts.length,
-      facturacion: sumCuts(dayCuts)
-    }
-  })
-
-  return {
-    mes: month,
-    anio: year,
-    cortes: monthCuts.length,
-    facturacion: sumCuts(monthCuts),
-    porDia,
-    detalle: monthCuts
-  }
-}
-
-const buildYearReport = (cuts: any[], reference = new Date()) => {
-  const year = reference.getFullYear()
-  const yearCuts = cuts.filter((cut) => getDate(cut).getFullYear() === year)
-
-  return {
-    anio: year,
-    cortes: yearCuts.length,
-    facturacion: sumCuts(yearCuts),
-    porMes: monthNames.map((nombreMes, index) => {
-      const monthCuts = yearCuts.filter((cut) => getDate(cut).getMonth() === index)
-
-      return {
-        mes: index + 1,
-        nombreMes,
-        cortes: monthCuts.length,
-        facturacion: sumCuts(monthCuts)
-      }
-    })
-  }
-}
-
-export const invalidateAppDataCache = () => {
-  cache = null
-}
+/* =========================
+   MAIN GET
+========================= */
 
 export const getAppData = async (): Promise<AppData> => {
-  if (cache && cache.expiresAt > Date.now()) {
-    return cache.data
-  }
+  if (cache && cache.expiresAt > Date.now()) return cache.data
 
-  const [barbersResult, servicesResult, cutsResult, expensesResult] = await Promise.all([
-    supabase.from('barbers').select('*'),
-    supabase.from('services').select('*'),
-    supabase.from('cuts').select('*').order('created_at', { ascending: false }),
-    supabase.from('expenses').select('*').order('created_at', { ascending: false })
-  ])
+  const [barbersRes, servicesRes, cutsRes, expensesRes] =
+    await Promise.all([
+      supabase.from('barbers').select('*'),
+      supabase.from('services').select('*'),
+      supabase.from('cuts').select('*'),
+      supabase.from('expenses').select('*')
+    ])
 
-  const error = barbersResult.error
-    ?? servicesResult.error
-    ?? cutsResult.error
-    ?? expensesResult.error
+  const barbers = (barbersRes.data ?? []).map(normalizeBarber)
+  const services = (servicesRes.data ?? []).map(normalizeService)
+  const expenses = (expensesRes.data ?? []).map(normalizeExpense)
 
-  if (error) throw error
+  const barbersById = new Map<number, BarberType>(
+    barbers.map((barber: BarberType) => [barber.id, barber])
+  )
+  const servicesById = new Map<number, ServiceType>(
+    services.map((service: ServiceType) => [service.id, service])
+  )
 
-  const barbers = (barbersResult.data ?? []).map(normalizeBarber)
-  const services = (servicesResult.data ?? []).map(normalizeService)
-  const barbersById = new Map(barbers.map((barber) => [barber.id, barber]))
-  const servicesById = new Map(services.map((service) => [service.id, service]))
-  const cuts = (cutsResult.data ?? []).map((cut) => normalizeCut(cut, barbersById, servicesById))
-  const expenses = (expensesResult.data ?? []).map(normalizeExpense)
+  const cuts = (cutsRes.data ?? []).map((cut: any) =>
+    normalizeCut(cut, barbersById, servicesById)
+  )
 
-  const data = {
+  const data: AppData = {
     dashboard: buildDashboard(cuts, expenses, barbers),
-    month: buildMonthReport(cuts),
-    year: buildYearReport(cuts),
+    month: {},
+    year: {},
     cuts,
     barbers,
     services,
