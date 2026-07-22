@@ -14,9 +14,6 @@ import { requireAuth } from './middlewares/auth.middleware'
 
 const app = express()
 
-// ======================
-// CORS (PROD + DEV)
-// ======================
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -27,24 +24,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
 
-// ======================
-// BASE MIDDLEWARES
-// ======================
+app.options('*', cors())
+
 app.use(express.json())
 
-// ======================
-// PUBLIC ROUTES
-// ======================
 app.use('/api/auth', authRoutes)
 
-// ======================
-// PROTECT API (TODO LO DEMÁS)
-// ======================
 app.use('/api', requireAuth)
 
-// ======================
-// PRIVATE ROUTES
-// ======================
 app.use('/api/barbers', barberRoutes)
 app.use('/api/cuts', cutRoutes)
 app.use('/api/services', serviceRoutes)
@@ -52,15 +39,10 @@ app.use('/api/expenses', expenseRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/bootstrap', bootstrapRoutes)
 
-// ======================
-// FRONTEND STATIC (OPCIONAL EN RENDER)
-// ======================
 const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist))
-
-  // ⚠️ IMPORTANTE: SIN wildcard raro (* ni regex peligroso)
   app.get('/', (_req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'))
   })
