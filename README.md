@@ -50,7 +50,7 @@ Crear `backend/.env`:
 ```env
 SUPABASE_KEY=tu_supabase_key
 JWT_SECRET=una_clave_larga_y_privada
-AUTH_EMAIL=admin@barber.local
+AUTH_USERNAME=Adminwest
 AUTH_PASSWORD=admin123
 AUTH_NAME=Administrador
 PORT=3000
@@ -108,7 +108,7 @@ Esto compila el frontend y el backend. Luego Express sirve todo desde un solo pu
 
 ## Login
 
-El usuario inicia sesion con email y password. El backend devuelve un JWT y el frontend lo guarda en `localStorage`.
+El usuario inicia sesion con username y password. El backend devuelve un JWT y el frontend lo guarda en `localStorage`.
 
 Todas las requests privadas incluyen:
 
@@ -139,4 +139,3 @@ Ruta publica:
 - Registro y eliminacion de gastos
 - Reportes mensual/anual
 - Un solo servidor en produccion
-

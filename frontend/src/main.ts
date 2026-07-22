@@ -116,8 +116,8 @@ const renderLogin = () => {
           <h1>Iniciar sesion</h1>
         </div>
 
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" autocomplete="email" required>
+        <label for="loginUsername">Usuario</label>
+        <input type="text" id="loginUsername" autocomplete="username" required>
 
         <label for="loginPassword">Password</label>
         <input type="password" id="loginPassword" autocomplete="current-password" required>
@@ -132,11 +132,11 @@ const renderLogin = () => {
   document.querySelector<HTMLFormElement>('#loginForm')?.addEventListener('submit', async (event) => {
     event.preventDefault()
 
-    const email = document.querySelector<HTMLInputElement>('#loginEmail')?.value.trim()
+    const username = document.querySelector<HTMLInputElement>('#loginUsername')?.value.trim()
     const password = document.querySelector<HTMLInputElement>('#loginPassword')?.value
-    if (!email || !password) return
+    if (!username || !password) return
 
-    const session = await login(email, password)
+    const session = await login(username, password)
     state.user = session.user
     await loadAll()
     render()

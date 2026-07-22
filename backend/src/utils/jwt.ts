@@ -2,7 +2,7 @@ import crypto from 'crypto'
 
 type JwtPayload = {
   sub: string
-  email: string
+  username: string
   name: string
   exp: number
 }

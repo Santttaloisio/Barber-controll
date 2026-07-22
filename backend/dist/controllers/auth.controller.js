@@ -4,24 +4,25 @@ exports.login = void 0;
 const jwt_1 = require("../utils/jwt");
 const getAuthConfig = () => {
     return {
-        email: process.env.AUTH_EMAIL ?? 'admin@barber.local',
+        username: process.env.AUTH_USERNAME ?? process.env.AUTH_EMAIL ?? 'Adminwest',
         password: process.env.AUTH_PASSWORD ?? 'admin123',
         name: process.env.AUTH_NAME ?? 'Administrador'
     };
 };
 const login = (req, res) => {
-    const { email, password } = req.body;
+    const { username, email, password } = req.body;
     const auth = getAuthConfig();
-    if (email !== auth.email || password !== auth.password) {
+    const loginName = username ?? email;
+    if (loginName !== auth.username || password !== auth.password) {
         return res.status(401).json({ message: 'Credenciales invalidas' });
     }
     const user = {
-        email: auth.email,
+        username: auth.username,
         name: auth.name
     };
     const token = (0, jwt_1.signToken)({
-        sub: auth.email,
-        email: auth.email,
+        sub: auth.username,
+        username: auth.username,
         name: auth.name
     });
     return res.json({ token, user });

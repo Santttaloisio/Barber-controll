@@ -163,7 +163,7 @@ export type BootstrapData = {
 }
 
 export type User = {
-  email: string
+  username: string
   name: string
 }
 
