@@ -15,16 +15,10 @@ import { requireAuth } from './middlewares/auth.middleware'
 const app = express()
 
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://barber-control.vercel.app'
-  ],
+  origin: 'https://barber-control.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
-
-app.options('*', cors())
 
 app.use(express.json())
 
@@ -43,6 +37,7 @@ const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist))
+
   app.get('/', (_req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'))
   })
