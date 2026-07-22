@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "set NODE_OPTIONS=--dns-result-order=ipv4first && ts-node-dev --respawn src/server.ts",
     "build": "tsc",
-    "build:full": "npm --prefix ../frontend run build && tsc",
-    "start": "node dist/server.js"
+    "build:frontend": "cd ../frontend && npm install && npm run build",
+    "build:full":"cd ../frontend && npm install && npm run build && cd ../backend && npm install && tsc",
+    "start": "node dist/server.js",
+    "postinstall": "npm run build"
   },
   "keywords": [],
   "author": "",
