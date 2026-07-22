@@ -5,13 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "set NODE_OPTIONS=--dns-result-order=ipv4first && ts-node-dev --respawn src/server.ts",
-
     "build": "tsc",
-
-    "build:frontend": "cd ../frontend && npm install && npm run build",
-
-    "build:full": "npm run build:frontend && npm install && tsc",
-
     "start": "node dist/server.js"
   },
   "keywords": [],
