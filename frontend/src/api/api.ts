@@ -12,9 +12,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 const TOKEN_KEY = 'barber-control-token'
 const USER_KEY = 'barber-control-user'
 
-export const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY)
-}
+export const getToken = () => localStorage.getItem(TOKEN_KEY)
 
 export const getStoredUser = () => {
   const user = localStorage.getItem(USER_KEY)
@@ -41,12 +39,13 @@ const request = async (url: string, options?: RequestInit) => {
     ...options,
     headers
   })
-  const data = await res.json()
+
+  const data = await res.json().catch(() => null)
 
   if (res.status === 401) clearSession()
 
   if (!res.ok) {
-    throw new Error(data?.error?.message ?? data?.message ?? 'Error de API')
+    throw new Error(data?.message ?? 'Error de API')
   }
 
   return data
@@ -81,8 +80,8 @@ const normalizeExpense = (expense: any): Expense => ({
 })
 
 const normalizeCut = (cut: any): Cut => {
-  const barber = cut.Barber ?? cut.barber ?? cut.barbers
-  const service = cut.Service ?? cut.service ?? cut.services
+  const barber = cut.Barber ?? cut.barber
+  const service = cut.Service ?? cut.service
 
   return {
     ...cut,
@@ -99,16 +98,14 @@ const normalizeCut = (cut: any): Cut => {
   }
 }
 
-// ======================
-// AUTH / BOOTSTRAP
-// ======================
 export async function login(username: string, password: string): Promise<LoginResponse> {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   })
-  const data = await res.json()
+
+  const data = await res.json().catch(() => null)
 
   if (!res.ok) {
     throw new Error(data?.message ?? 'No se pudo iniciar sesion')
@@ -132,13 +129,10 @@ export async function getBootstrap(): Promise<BootstrapData> {
   }
 }
 
-// ======================
-// BARBERS
-// ======================
 export async function createBarber(data: any) {
   return request(`${BASE_URL}/barbers`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: data.nombre ?? data.name
     })
@@ -147,36 +141,28 @@ export async function createBarber(data: any) {
 
 export async function deleteBarber(id: number) {
   return request(`${BASE_URL}/barbers/${id}`, {
-    method: "DELETE"
+    method: 'DELETE'
   })
 }
 
-// ======================
-// CUTS
-// ======================
 export async function createCut(data: any) {
   return request(`${BASE_URL}/cuts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       barber_id: data.barberId ?? data.barber_id,
       service_id: data.serviceId ?? data.service_id,
       price: data.monto ?? data.price,
       payment_method: data.metodoPago ?? data.payment_method,
-      metodoPago: data.metodoPago ?? data.payment_method,
-      paymentMethod: data.metodoPago ?? data.payment_method,
       observation: data.observacion ?? data.observation
     })
   })
 }
 
-// ======================
-// SERVICES
-// ======================
 export async function createService(data: any) {
   return request(`${BASE_URL}/services`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: data.nombre ?? data.name,
       price: data.precioBase ?? data.price
@@ -186,8 +172,8 @@ export async function createService(data: any) {
 
 export async function updateService(id: number, data: any) {
   return request(`${BASE_URL}/services/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: data.nombre ?? data.name,
       price: data.precioBase ?? data.price
@@ -195,13 +181,10 @@ export async function updateService(id: number, data: any) {
   })
 }
 
-// ======================
-// EXPENSES
-// ======================
 export async function createExpense(data: any) {
   return request(`${BASE_URL}/expenses`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       category: data.categoria ?? data.category,
       description: data.descripcion ?? data.description,
@@ -215,6 +198,6 @@ export async function createExpense(data: any) {
 
 export async function deleteExpense(id: number) {
   return request(`${BASE_URL}/expenses/${id}`, {
-    method: "DELETE"
+    method: 'DELETE'
   })
 }
