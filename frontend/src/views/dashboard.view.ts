@@ -4,234 +4,162 @@ import type {
   DashboardSummaryMode,
   ExpenseCategoryReport,
   MonthReport,
-  PaymentMethodReport,
+  TodayCutReport,
   YearReport
 } from '../types'
 
 import { formatMoney } from '../utils/formatters'
-import {
-  renderCutsByDayChart,
-  renderCutsByMonthChart
-} from '../components/chart'
+import { renderCutsByDayChart, renderCutsByMonthChart } from '../components/chart'
 
-const renderPaymentMethods = (paymentMethods: PaymentMethodReport[]) => {
-  if (paymentMethods.length === 0) {
-    return `<p class="empty">Todavía no hay pagos registrados este mes.</p>`
-  }
-
-  return paymentMethods.map((payment) => {
-    return `
-      <article class="barber-item">
-        <div>
-          <h3>${payment.metodoPago}</h3>
-          <p>${payment.cortes} cortes cobrados</p>
-        </div>
-
-        <strong>${formatMoney(payment.facturacion)}</strong>
-      </article>
-    `
-  }).join('')
+const safeArray = <T,>(arr: T[] | undefined | null): T[] => {
+  return Array.isArray(arr) ? arr : []
 }
 
-const renderExpenseCategories = (categories: ExpenseCategoryReport[]) => {
-  if (categories.length === 0) {
-    return `<p class="empty">Todavía no hay gastos registrados este mes.</p>`
+const renderTodayCuts = (cuts?: TodayCutReport[]) => {
+  const data = safeArray(cuts)
+
+  if (data.length === 0) {
+    return `<p class="empty">Todavia no hay cortes cargados hoy.</p>`
   }
 
-  return categories.map((category) => {
-    return `
-      <article class="barber-item">
-        <div>
-          <h3>${category.categoria}</h3>
-          <p>${category.cantidad} gastos cargados</p>
-        </div>
-
-        <strong>${formatMoney(category.total)}</strong>
-      </article>
-    `
-  }).join('')
+  return data.map((cut) => `
+    <article class="barber-item">
+      <div>
+        <h3>${cut.nombreBarbero ?? 'Sin nombre'}</h3>
+        <p>${cut.metodoPago ?? 'Sin metodo'}</p>
+      </div>
+      <strong>${formatMoney(cut.monto ?? 0)}</strong>
+    </article>
+  `).join('')
 }
 
-const renderBarberBilling = (dashboard: DashboardReport) => {
-  if (dashboard.facturacionPorBarbero.length === 0) {
-    return `<p class="empty">Todavía no hay cortes cargados.</p>`
+const renderExpenseCategories = (categories?: ExpenseCategoryReport[]) => {
+  const data = safeArray(categories)
+
+  if (data.length === 0) {
+    return `<p class="empty">Sin gastos registrados.</p>`
   }
 
-  return dashboard.facturacionPorBarbero.map((barber) => {
-    return `
-      <article class="barber-item">
-        <div>
-          <h3>${barber.nombre}</h3>
-          <p>${barber.cortes} cortes realizados</p>
-        </div>
-
-        <strong>${formatMoney(barber.facturacion)}</strong>
-      </article>
-    `
-  }).join('')
+  return data.map((c) => `
+    <article class="barber-item">
+      <div>
+        <h3>${c.categoria ?? 'Sin categoria'}</h3>
+        <p>${c.cantidad ?? 0} gastos</p>
+      </div>
+      <strong>${formatMoney(c.total ?? 0)}</strong>
+    </article>
+  `).join('')
 }
 
-const getSummaryTitle = (summaryMode: DashboardSummaryMode) => {
-  if (summaryMode === 'payments') {
-    return 'Métodos de pago'
+const renderBarberBilling = (dashboard?: DashboardReport) => {
+  const data = safeArray(dashboard?.facturacionPorBarbero)
+
+  if (data.length === 0) {
+    return `<p class="empty">Sin cortes registrados.</p>`
   }
 
-  if (summaryMode === 'barbers') {
-    return 'Facturación por barbero'
-  }
-
-  return 'Gastos por categoría'
+  return data.map((b) => `
+    <article class="barber-item">
+      <div>
+        <h3>${b.nombre ?? 'Sin nombre'}</h3>
+        <p>${b.cortes ?? 0} cortes</p>
+      </div>
+      <strong>${formatMoney(b.facturacion ?? 0)}</strong>
+    </article>
+  `).join('')
 }
 
-const getSummaryDescription = (summaryMode: DashboardSummaryMode) => {
-  if (summaryMode === 'payments') {
-    return 'Resumen de cobros del mes actual'
-  }
-
-  if (summaryMode === 'barbers') {
-    return 'Resumen de rendimiento por barbero'
-  }
-
-  return 'Resumen de gastos del mes actual'
+const getSummaryTitle = (mode: DashboardSummaryMode) => {
+  if (mode === 'payments') return 'Cortes del dia'
+  if (mode === 'barbers') return 'Barberos'
+  return 'Gastos'
 }
 
-const renderSummaryContent = (
-  dashboard: DashboardReport,
-  summaryMode: DashboardSummaryMode
-) => {
-  if (summaryMode === 'payments') {
-    return renderPaymentMethods(dashboard.mes.porMetodoPago)
-  }
-
-  if (summaryMode === 'barbers') {
-    return renderBarberBilling(dashboard)
-  }
-
-  return renderExpenseCategories(dashboard.mes.gastosPorCategoria)
+const getSummaryDescription = (mode: DashboardSummaryMode) => {
+  if (mode === 'payments') return 'Cortes realizados hoy'
+  if (mode === 'barbers') return 'Rendimiento por barbero'
+  return 'Gastos del periodo'
 }
 
 export const renderDashboardView = (
-  dashboard: DashboardReport,
-  monthReport: MonthReport,
-  yearReport: YearReport,
+  dashboard: DashboardReport | null,
+  monthReport: MonthReport | null,
+  yearReport: YearReport | null,
   chartMode: DashboardChartMode,
   summaryMode: DashboardSummaryMode
 ) => {
+  if (!dashboard || !monthReport || !yearReport) {
+    return `
+      <section class="panel">
+        <p class="empty">Cargando dashboard...</p>
+      </section>
+    `
+  }
+
   return `
     <section class="cards">
       <article class="card">
-        <span>Cortes de hoy</span>
-        <strong>${dashboard.hoy.cortes}</strong>
+        <span>Cortes hoy</span>
+        <strong>${dashboard.hoy?.cortes ?? 0}</strong>
       </article>
 
       <article class="card">
-        <span>Facturación de hoy</span>
-        <strong>${formatMoney(dashboard.hoy.facturacion)}</strong>
+        <span>Facturacion hoy</span>
+        <strong>${formatMoney(dashboard.hoy?.facturacion ?? 0)}</strong>
       </article>
 
       <article class="card">
-        <span>Cortes del mes</span>
-        <strong>${dashboard.mes.cortes}</strong>
+        <span>Cortes mes</span>
+        <strong>${dashboard.mes?.cortes ?? 0}</strong>
       </article>
 
       <article class="card">
-        <span>Facturación mensual</span>
-        <strong>${formatMoney(dashboard.mes.facturacion)}</strong>
+        <span>Facturacion mes</span>
+        <strong>${formatMoney(dashboard.mes?.facturacion ?? 0)}</strong>
       </article>
 
       <article class="card">
-        <span>Gastos del mes</span>
-        <strong>${formatMoney(dashboard.mes.gastos)}</strong>
+        <span>Gastos</span>
+        <strong>${formatMoney(dashboard.mes?.gastos ?? 0)}</strong>
       </article>
 
       <article class="card">
-        <span>Ganancia estimada</span>
-        <strong>${formatMoney(dashboard.mes.gananciaEstimada)}</strong>
+        <span>Ganancia</span>
+        <strong>${formatMoney(dashboard.mes?.gananciaEstimada ?? 0)}</strong>
       </article>
     </section>
 
     <section class="dashboard-main-grid">
-      <article class="panel chart-panel">
-        <div class="panel-header chart-panel-header">
-          <div>
-            <h2>${chartMode === 'month' ? 'Facturación por día' : 'Facturación por mes'}</h2>
-            <p>
-              ${
-                chartMode === 'month'
-                  ? 'Resumen del mes actual'
-                  : `Resumen del año ${yearReport.anio}`
-              }
-            </p>
-          </div>
 
-          <div class="chart-mode-actions">
-            <button
-              type="button"
-              class="chart-mode-button ${chartMode === 'month' ? 'active' : ''}"
-              data-chart-mode="month"
-            >
-              Mes
-            </button>
+      <article class="panel">
+        <h2>
+          ${chartMode === 'month' ? 'Facturacion mensual' : 'Facturacion anual'}
+        </h2>
 
-            <button
-              type="button"
-              class="chart-mode-button ${chartMode === 'year' ? 'active' : ''}"
-              data-chart-mode="year"
-            >
-              Año
-            </button>
-          </div>
-        </div>
-
-        <div class="chart chart-large">
+        <div class="chart">
           ${
             chartMode === 'month'
-              ? renderCutsByDayChart(monthReport.porDia)
-              : renderCutsByMonthChart(yearReport.porMes)
+              ? renderCutsByDayChart(monthReport?.porDia ?? [])
+              : renderCutsByMonthChart(yearReport?.porMes ?? [])
           }
         </div>
       </article>
 
-      <article class="panel dashboard-summary-panel">
-        <div class="panel-header summary-panel-header">
-          <div>
-            <h2>${getSummaryTitle(summaryMode)}</h2>
-            <p>${getSummaryDescription(summaryMode)}</p>
-          </div>
+      <article class="panel">
+        <h2>${getSummaryTitle(summaryMode)}</h2>
+        <p>${getSummaryDescription(summaryMode)}</p>
 
-          <div class="summary-mode-actions">
-            <button
-              type="button"
-              class="summary-mode-button ${summaryMode === 'payments' ? 'active' : ''}"
-              data-summary-mode="payments"
-            >
-              Pagos
-            </button>
-
-            <button
-              type="button"
-              class="summary-mode-button ${summaryMode === 'barbers' ? 'active' : ''}"
-              data-summary-mode="barbers"
-            >
-              Barberos
-            </button>
-
-            <button
-              type="button"
-              class="summary-mode-button ${summaryMode === 'expenses' ? 'active' : ''}"
-              data-summary-mode="expenses"
-            >
-              Gastos
-            </button>
-          </div>
-        </div>
-
-        <div class="dashboard-summary-content">
-          <div class="barber-list">
-            ${renderSummaryContent(dashboard, summaryMode)}
-          </div>
+        <div class="barber-list">
+          ${
+            summaryMode === 'payments'
+              ? renderTodayCuts(dashboard.hoy?.detalle)
+              : summaryMode === 'barbers'
+                ? renderBarberBilling(dashboard)
+                : renderExpenseCategories(dashboard.mes?.gastosPorCategoria)
+          }
         </div>
       </article>
+
     </section>
   `
 }

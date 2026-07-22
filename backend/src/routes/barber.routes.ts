@@ -1,5 +1,9 @@
 import { Router } from 'express'
-import { getBarbers, createBarber, deleteBarber } from '../controllers/barber.controller'
+import {
+  getBarbers,
+  createBarber,
+  deleteBarber
+} from '../controllers/barber.controller'
 
 const router = Router()
 

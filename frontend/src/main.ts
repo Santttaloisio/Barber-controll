@@ -5,16 +5,14 @@ import {
   createCut,
   createExpense,
   createService,
+  clearSession,
   deleteBarber,
   deleteExpense,
-  getBarbers,
-  getCuts,
-  getDashboardReport,
-  getExpenses,
-  getMonthReport,
-  getServices,
-  getYearReport,
-  updateServicePrice
+  getBootstrap,
+  getStoredUser,
+  getToken,
+  login,
+  updateService
 } from './api/api'
 
 import type {
@@ -24,9 +22,9 @@ import type {
   DashboardReport,
   DashboardSummaryMode,
   Expense,
-  ExpenseCategory,
   MonthReport,
   Service,
+  User,
   YearReport
 } from './types'
 
@@ -41,581 +39,382 @@ import { renderExpensesView, type ExpenseFilters } from './views/gastos.view'
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
-let currentView: ViewName = 'dashboard'
+const state = {
+  user: getStoredUser() as User | null,
+  view: 'dashboard' as ViewName,
 
-let dashboardReport: DashboardReport | null = null
-let monthReport: MonthReport | null = null
-let yearReport: YearReport | null = null
+  dashboard: null as DashboardReport | null,
+  month: null as MonthReport | null,
+  year: null as YearReport | null,
 
-let cuts: Cut[] = []
-let barbers: Barber[] = []
-let services: Service[] = []
-let expenses: Expense[] = []
+  cuts: [] as Cut[],
+  barbers: [] as Barber[],
+  services: [] as Service[],
+  expenses: [] as Expense[],
 
-let dashboardChartMode: DashboardChartMode = 'month'
-let dashboardSummaryMode: DashboardSummaryMode = 'payments'
+  chartMode: 'month' as DashboardChartMode,
+  summaryMode: 'payments' as DashboardSummaryMode,
 
-const getTodayInputDate = () => {
-  const now = new Date()
+  cutFilters: {
+    fromDate: '',
+    toDate: '',
+    barberId: '',
+    paymentMethod: ''
+  } as CutFilters,
 
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
+  expenseFilters: {
+    fromDate: '',
+    toDate: '',
+    category: '',
+    paymentMethod: ''
+  } as ExpenseFilters
 }
 
-let cutFilters: CutFilters = {
-  fromDate: getTodayInputDate(),
-  toDate: getTodayInputDate(),
-  barberId: '',
-  paymentMethod: ''
+const loadAll = async () => {
+  const data = await getBootstrap()
+
+  state.dashboard = data.dashboard
+  state.month = data.month
+  state.year = data.year
+  state.cuts = data.cuts
+  state.barbers = data.barbers
+  state.services = data.services
+  state.expenses = data.expenses
 }
 
-let expenseFilters: ExpenseFilters = {
-  fromDate: '',
-  toDate: '',
-  category: '',
-  paymentMethod: ''
+const reloadAndRender = async () => {
+  await loadAll()
+  render()
 }
 
-const renderLoading = () => {
+const showMessage = (message: string) => {
+  const target = document.querySelector<HTMLParagraphElement>('#message')
+  if (!target) return
+
+  target.textContent = message
+  window.setTimeout(() => {
+    target.textContent = ''
+  }, 2500)
+}
+
+window.addEventListener('unhandledrejection', (event) => {
+  const message = event.reason instanceof Error
+    ? event.reason.message
+    : 'No se pudo completar la accion'
+
+  showMessage(message)
+})
+
+const renderLogin = () => {
   if (!app) return
 
   app.innerHTML = `
-    <main class="layout">
-      <section class="panel">
-        <p class="empty">Cargando aplicación...</p>
-      </section>
+    <main class="login-page">
+      <form id="loginForm" class="form-card login-card">
+        <div>
+          <p class="eyebrow">Barber Control</p>
+          <h1>Iniciar sesion</h1>
+        </div>
+
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" autocomplete="email" required>
+
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" required>
+
+        <button type="submit">Entrar</button>
+
+        <p id="message"></p>
+      </form>
     </main>
   `
+
+  document.querySelector<HTMLFormElement>('#loginForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+
+    const email = document.querySelector<HTMLInputElement>('#loginEmail')?.value.trim()
+    const password = document.querySelector<HTMLInputElement>('#loginPassword')?.value
+    if (!email || !password) return
+
+    const session = await login(email, password)
+    state.user = session.user
+    await loadAll()
+    render()
+  })
 }
 
-const showMessage = (text: string) => {
-  const message = document.querySelector<HTMLParagraphElement>('#message')
-
-  if (!message) return
-
-  message.textContent = text
-  message.classList.add('active')
-
-  setTimeout(() => {
-    message.classList.remove('active')
-    message.textContent = ''
-  }, 3000)
-}
-
-const loadDashboardData = async () => {
-  dashboardReport = await getDashboardReport()
-  monthReport = await getMonthReport()
-  yearReport = await getYearReport()
-}
-
-const loadCutsData = async () => {
-  cuts = await getCuts()
-}
-
-const loadBarbersData = async () => {
-  barbers = await getBarbers()
-}
-
-const loadServicesData = async () => {
-  services = await getServices()
-}
-
-const loadExpensesData = async () => {
-  expenses = await getExpenses()
-}
-
-const getCurrentViewHtml = () => {
-  if (currentView === 'dashboard') {
-    if (!dashboardReport || !monthReport || !yearReport) {
-      return `<section class="panel"><p class="empty">Cargando dashboard...</p></section>`
-    }
-
+const getView = () => {
+  if (state.view === 'dashboard') {
     return renderDashboardView(
-      dashboardReport,
-      monthReport,
-      yearReport,
-      dashboardChartMode,
-      dashboardSummaryMode
+      state.dashboard,
+      state.month,
+      state.year,
+      state.chartMode,
+      state.summaryMode
     )
   }
 
-  if (currentView === 'cortes') {
-    return renderCutsView(cuts, cutFilters)
+  if (state.view === 'cortes') {
+    return renderCutsView(
+      state.cuts,
+      state.barbers,
+      state.services,
+      state.cutFilters
+    )
   }
 
-  if (currentView === 'barberos') {
-    return renderBarbersView(barbers)
-  }
-
-  if (currentView === 'servicios') {
-    return renderServicesView(services)
-  }
-
-  if (currentView === 'gastos') {
-    return renderExpensesView(expenses, expenseFilters)
-  }
+  if (state.view === 'barberos') return renderBarbersView(state.barbers)
+  if (state.view === 'servicios') return renderServicesView(state.services)
+  if (state.view === 'gastos') return renderExpensesView(state.expenses, state.expenseFilters)
 
   return ''
 }
 
-const renderApp = () => {
+const render = () => {
   if (!app) return
+
+  if (!state.user) {
+    renderLogin()
+    return
+  }
 
   app.innerHTML = `
     <main class="layout">
       <section class="hero hero-logo">
-        <img
-          class="brand-logo"
-          src="/assets/west-coast-logo.jpg"
-          alt="West Coast Studio"
-        >
+        <img class="brand-logo" src="/assets/west-coast-logo.jpg" />
       </section>
 
-      ${renderTabs(currentView)}
+      <div class="topbar">
+        <span>${state.user.name}</span>
+        <button id="logoutButton" type="button">Salir</button>
+      </div>
+
+      ${renderTabs(state.view)}
 
       <section class="content">
-        ${getCurrentViewHtml()}
+        ${getView()}
       </section>
     </main>
 
-    ${renderCutModal(barbers, services)}
+    ${renderCutModal(state.barbers, state.services)}
     ${renderEditServicePriceModal()}
 
-    <p id="message" class="message"></p>
+    <p id="message"></p>
   `
 
   setupEvents()
 }
 
 const setupEvents = () => {
-  const tabButtons = document.querySelectorAll<HTMLButtonElement>('.tab')
+  document.querySelector('#logoutButton')?.addEventListener('click', () => {
+    clearSession()
+    state.user = null
+    renderLogin()
+  })
 
-  tabButtons.forEach((button) => {
-    button.addEventListener('click', async () => {
-      const view = button.dataset.view as ViewName
-
-      currentView = view
-
-      if (view === 'dashboard') {
-        await loadDashboardData()
-      }
-
-      if (view === 'cortes') {
-        await loadCutsData()
-      }
-
-      if (view === 'barberos') {
-        await loadBarbersData()
-      }
-
-      if (view === 'servicios') {
-        await loadServicesData()
-      }
-
-      if (view === 'gastos') {
-        await loadExpensesData()
-      }
-
-      renderApp()
+  document.querySelectorAll<HTMLElement>('[data-view]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.view = btn.dataset.view as ViewName
+      render()
     })
   })
 
-  const chartModeButtons = document.querySelectorAll<HTMLButtonElement>('.chart-mode-button')
-
-  chartModeButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const mode = button.dataset.chartMode as DashboardChartMode
-
-      dashboardChartMode = mode
-
-      renderApp()
-    })
-  })
-
-  const summaryModeButtons = document.querySelectorAll<HTMLButtonElement>('.summary-mode-button')
-
-  summaryModeButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const mode = button.dataset.summaryMode as DashboardSummaryMode
-
-      dashboardSummaryMode = mode
-
-      renderApp()
-    })
-  })
-
-  const deleteBarberButtons = document.querySelectorAll<HTMLButtonElement>('.delete-barber-button')
-
-  deleteBarberButtons.forEach((button) => {
-    button.addEventListener('click', async () => {
-      const barberId = Number(button.dataset.id)
-
-      const confirmDelete = confirm(
-        '¿Seguro que querés eliminar este barbero? No aparecerá más para cargar cortes nuevos.'
-      )
-
-      if (!confirmDelete) return
-
-      try {
-        await deleteBarber(barberId)
-
-        await loadBarbersData()
-        renderApp()
-        showMessage('Barbero eliminado correctamente')
-      } catch (error) {
-        showMessage('No se pudo eliminar el barbero')
-      }
-    })
-  })
-
-  const editServiceModal = document.querySelector<HTMLDivElement>('#editServiceModal')
-  const closeEditServiceModal = document.querySelector<HTMLButtonElement>('#closeEditServiceModal')
-  const editServicePriceButtons = document.querySelectorAll<HTMLButtonElement>('.edit-service-price-button')
-  const editServicePriceForm = document.querySelector<HTMLFormElement>('#editServicePriceForm')
-
-  editServicePriceButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const serviceId = button.dataset.id ?? ''
-      const serviceName = button.dataset.name ?? ''
-      const currentPrice = button.dataset.price ?? ''
-
-      const serviceIdInput = document.querySelector<HTMLInputElement>('#editServiceId')
-      const serviceNameInput = document.querySelector<HTMLInputElement>('#editServiceName')
-      const servicePriceInput = document.querySelector<HTMLInputElement>('#editServicePrice')
-
-      if (!serviceIdInput || !serviceNameInput || !servicePriceInput) return
-
-      serviceIdInput.value = serviceId
-      serviceNameInput.value = serviceName
-      servicePriceInput.value = currentPrice
-
-      editServiceModal?.classList.add('active')
-    })
-  })
-
-  closeEditServiceModal?.addEventListener('click', () => {
-    editServiceModal?.classList.remove('active')
-  })
-
-  editServiceModal?.addEventListener('click', (event) => {
-    if (event.target === editServiceModal) {
-      editServiceModal.classList.remove('active')
-    }
-  })
-
-  editServicePriceForm?.addEventListener('submit', async (event) => {
+  document.querySelector<HTMLFormElement>('#barberForm')?.addEventListener('submit', async (event) => {
     event.preventDefault()
 
-    const serviceIdInput = document.querySelector<HTMLInputElement>('#editServiceId')
-    const servicePriceInput = document.querySelector<HTMLInputElement>('#editServicePrice')
+    const name = document.querySelector<HTMLInputElement>('#barberName')?.value.trim()
+    if (!name) return
 
-    if (!serviceIdInput || !servicePriceInput) return
-
-    const serviceId = Number(serviceIdInput.value)
-    const priceNumber = Number(servicePriceInput.value)
-
-    if (!Number.isFinite(priceNumber) || priceNumber <= 0) {
-      showMessage('El precio ingresado no es válido')
-      return
-    }
-
-    try {
-      await updateServicePrice(serviceId, priceNumber)
-
-      editServiceModal?.classList.remove('active')
-
-      await loadServicesData()
-      renderApp()
-      showMessage('Precio actualizado correctamente')
-    } catch (error) {
-      showMessage('No se pudo actualizar el precio')
-    }
+    await createBarber({ nombre: name })
+    await reloadAndRender()
+    showMessage('Barbero guardado')
   })
 
-  const cutFilterFrom = document.querySelector<HTMLInputElement>('#cutFilterFrom')
-  const cutFilterTo = document.querySelector<HTMLInputElement>('#cutFilterTo')
-  const cutFilterBarber = document.querySelector<HTMLSelectElement>('#cutFilterBarber')
-  const cutFilterPayment = document.querySelector<HTMLSelectElement>('#cutFilterPayment')
-  const clearCutFilters = document.querySelector<HTMLButtonElement>('#clearCutFilters')
+  document.querySelectorAll<HTMLButtonElement>('.delete-barber-button').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = Number(button.dataset.id)
+      if (!id) return
+
+      await deleteBarber(id)
+      await reloadAndRender()
+      showMessage('Barbero eliminado')
+    })
+  })
+
+  document.querySelector<HTMLFormElement>('#serviceForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+
+    const name = document.querySelector<HTMLInputElement>('#serviceName')?.value.trim()
+    const price = Number(document.querySelector<HTMLInputElement>('#servicePrice')?.value)
+    if (!name || price <= 0) return
+
+    await createService({ nombre: name, precioBase: price })
+    await reloadAndRender()
+    showMessage('Servicio guardado')
+  })
+
+  document.querySelectorAll<HTMLButtonElement>('.edit-service-price-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelector<HTMLInputElement>('#editServiceId')!.value = button.dataset.id ?? ''
+      document.querySelector<HTMLInputElement>('#editServiceName')!.value = button.dataset.name ?? ''
+      document.querySelector<HTMLInputElement>('#editServicePrice')!.value = button.dataset.price ?? ''
+      document.querySelector<HTMLDivElement>('#editServiceModal')?.classList.add('active')
+    })
+  })
+
+  document.querySelector('#closeEditServiceModal')?.addEventListener('click', () => {
+    document.querySelector('#editServiceModal')?.classList.remove('active')
+  })
+
+  document.querySelector<HTMLFormElement>('#editServicePriceForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+
+    const id = Number(document.querySelector<HTMLInputElement>('#editServiceId')?.value)
+    const name = document.querySelector<HTMLInputElement>('#editServiceName')?.value.trim()
+    const price = Number(document.querySelector<HTMLInputElement>('#editServicePrice')?.value)
+    if (!id || !name || price <= 0) return
+
+    await updateService(id, { nombre: name, precioBase: price })
+    await reloadAndRender()
+    showMessage('Servicio actualizado')
+  })
+
+  const cutModal = document.querySelector<HTMLDivElement>('#cutModal')
+
+  document.querySelector('#openCutModal')?.addEventListener('click', () => {
+    cutModal?.classList.add('active')
+  })
+
+  document.querySelector('#closeCutModal')?.addEventListener('click', () => {
+    cutModal?.classList.remove('active')
+  })
+
+  cutModal?.addEventListener('click', (event) => {
+    if (event.target === cutModal) cutModal.classList.remove('active')
+  })
+
+  document.querySelector<HTMLSelectElement>('#serviceId')?.addEventListener('change', (event) => {
+    const serviceId = Number((event.currentTarget as HTMLSelectElement).value)
+    const service = state.services.find((item) => item.id === serviceId)
+    const amountInput = document.querySelector<HTMLInputElement>('#cutAmount')
+
+    if (service && amountInput) amountInput.value = String(service.precioBase)
+  })
+
+  document.querySelector<HTMLFormElement>('#cutForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+
+    const barberId = Number(document.querySelector<HTMLSelectElement>('#barberId')?.value)
+    const serviceId = Number(document.querySelector<HTMLSelectElement>('#serviceId')?.value)
+    const monto = Number(document.querySelector<HTMLInputElement>('#cutAmount')?.value)
+    const metodoPago = document.querySelector<HTMLSelectElement>('#paymentMethod')?.value
+    const observacion = document.querySelector<HTMLTextAreaElement>('#cutObservation')?.value.trim()
+    if (!barberId || !serviceId || monto <= 0 || !metodoPago) return
+
+    await createCut({ barberId, serviceId, monto, metodoPago, observacion })
+    await reloadAndRender()
+    showMessage('Corte registrado')
+  })
+
+  document.querySelector<HTMLFormElement>('#expenseForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+
+    const categoria = document.querySelector<HTMLSelectElement>('#expenseCategory')?.value
+    const descripcion = document.querySelector<HTMLInputElement>('#expenseDescription')?.value.trim()
+    const monto = Number(document.querySelector<HTMLInputElement>('#expenseAmount')?.value)
+    const metodoPago = document.querySelector<HTMLSelectElement>('#expensePaymentMethod')?.value
+    const fecha = document.querySelector<HTMLInputElement>('#expenseDate')?.value
+    const observacion = document.querySelector<HTMLTextAreaElement>('#expenseObservation')?.value.trim()
+    if (!categoria || !descripcion || monto <= 0 || !metodoPago) return
+
+    await createExpense({ categoria, descripcion, monto, metodoPago, fecha, observacion })
+    await reloadAndRender()
+    showMessage('Gasto guardado')
+  })
+
+  document.querySelectorAll<HTMLButtonElement>('.delete-expense-button').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = Number(button.dataset.id)
+      if (!id) return
+
+      await deleteExpense(id)
+      await reloadAndRender()
+      showMessage('Gasto eliminado')
+    })
+  })
 
   const updateCutFilters = () => {
-    cutFilters = {
-      fromDate: cutFilterFrom?.value ?? '',
-      toDate: cutFilterTo?.value ?? '',
-      barberId: cutFilterBarber?.value ?? '',
-      paymentMethod: cutFilterPayment?.value ?? ''
+    state.cutFilters = {
+      fromDate: document.querySelector<HTMLInputElement>('#cutFilterFrom')?.value ?? '',
+      toDate: document.querySelector<HTMLInputElement>('#cutFilterTo')?.value ?? '',
+      barberId: document.querySelector<HTMLSelectElement>('#cutFilterBarber')?.value ?? '',
+      paymentMethod: document.querySelector<HTMLSelectElement>('#cutFilterPayment')?.value ?? ''
     }
 
-    renderApp()
+    render()
   }
 
-  cutFilterFrom?.addEventListener('change', updateCutFilters)
-  cutFilterTo?.addEventListener('change', updateCutFilters)
-  cutFilterBarber?.addEventListener('change', updateCutFilters)
-  cutFilterPayment?.addEventListener('change', updateCutFilters)
+  document.querySelector('#cutFilterFrom')?.addEventListener('change', updateCutFilters)
+  document.querySelector('#cutFilterTo')?.addEventListener('change', updateCutFilters)
+  document.querySelector('#cutFilterBarber')?.addEventListener('change', updateCutFilters)
+  document.querySelector('#cutFilterPayment')?.addEventListener('change', updateCutFilters)
+  document.querySelector('#clearCutFilters')?.addEventListener('click', () => {
+    const today = new Date().toISOString().slice(0, 10)
 
-  clearCutFilters?.addEventListener('click', () => {
-    cutFilters = {
-      fromDate: getTodayInputDate(),
-      toDate: getTodayInputDate(),
+    state.cutFilters = {
+      fromDate: today,
+      toDate: today,
       barberId: '',
       paymentMethod: ''
     }
 
-    renderApp()
+    render()
   })
 
-  const expenseFilterFrom = document.querySelector<HTMLInputElement>('#expenseFilterFrom')
-  const expenseFilterTo = document.querySelector<HTMLInputElement>('#expenseFilterTo')
-  const expenseFilterCategory = document.querySelector<HTMLSelectElement>('#expenseFilterCategory')
-  const expenseFilterPayment = document.querySelector<HTMLSelectElement>('#expenseFilterPayment')
-  const clearExpenseFilters = document.querySelector<HTMLButtonElement>('#clearExpenseFilters')
-
   const updateExpenseFilters = () => {
-    expenseFilters = {
-      fromDate: expenseFilterFrom?.value ?? '',
-      toDate: expenseFilterTo?.value ?? '',
-      category: expenseFilterCategory?.value ?? '',
-      paymentMethod: expenseFilterPayment?.value ?? ''
+    state.expenseFilters = {
+      fromDate: document.querySelector<HTMLInputElement>('#expenseFilterFrom')?.value ?? '',
+      toDate: document.querySelector<HTMLInputElement>('#expenseFilterTo')?.value ?? '',
+      category: document.querySelector<HTMLSelectElement>('#expenseFilterCategory')?.value ?? '',
+      paymentMethod: document.querySelector<HTMLSelectElement>('#expenseFilterPayment')?.value ?? ''
     }
 
-    renderApp()
+    render()
   }
 
-  expenseFilterFrom?.addEventListener('change', updateExpenseFilters)
-  expenseFilterTo?.addEventListener('change', updateExpenseFilters)
-  expenseFilterCategory?.addEventListener('change', updateExpenseFilters)
-  expenseFilterPayment?.addEventListener('change', updateExpenseFilters)
-
-  clearExpenseFilters?.addEventListener('click', () => {
-    expenseFilters = {
+  document.querySelector('#expenseFilterFrom')?.addEventListener('change', updateExpenseFilters)
+  document.querySelector('#expenseFilterTo')?.addEventListener('change', updateExpenseFilters)
+  document.querySelector('#expenseFilterCategory')?.addEventListener('change', updateExpenseFilters)
+  document.querySelector('#expenseFilterPayment')?.addEventListener('change', updateExpenseFilters)
+  document.querySelector('#clearExpenseFilters')?.addEventListener('click', () => {
+    state.expenseFilters = {
       fromDate: '',
       toDate: '',
       category: '',
       paymentMethod: ''
     }
 
-    renderApp()
-  })
-
-  const openCutModal = document.querySelector<HTMLButtonElement>('#openCutModal')
-  const closeCutModal = document.querySelector<HTMLButtonElement>('#closeCutModal')
-  const cutModal = document.querySelector<HTMLDivElement>('#cutModal')
-
-  openCutModal?.addEventListener('click', () => {
-    cutModal?.classList.add('active')
-  })
-
-  closeCutModal?.addEventListener('click', () => {
-    cutModal?.classList.remove('active')
-  })
-
-  cutModal?.addEventListener('click', (event) => {
-    if (event.target === cutModal) {
-      cutModal.classList.remove('active')
-    }
-  })
-
-  const serviceSelect = document.querySelector<HTMLSelectElement>('#serviceId')
-  const amountInput = document.querySelector<HTMLInputElement>('#cutAmount')
-
-  serviceSelect?.addEventListener('change', () => {
-    const serviceId = Number(serviceSelect.value)
-
-    const selectedService = services.find((service) => {
-      return service.id === serviceId
-    })
-
-    if (selectedService && amountInput) {
-      amountInput.value = String(selectedService.precioBase)
-    }
-  })
-
-  const barberForm = document.querySelector<HTMLFormElement>('#barberForm')
-
-  barberForm?.addEventListener('submit', async (event) => {
-    event.preventDefault()
-
-    const nameInput = document.querySelector<HTMLInputElement>('#barberName')
-
-    if (!nameInput) return
-
-    try {
-      await createBarber({
-        nombre: nameInput.value
-      })
-
-      await loadBarbersData()
-      renderApp()
-      showMessage('Barbero guardado correctamente')
-    } catch (error) {
-      showMessage('Error al guardar el barbero')
-    }
-  })
-
-  const serviceForm = document.querySelector<HTMLFormElement>('#serviceForm')
-
-  serviceForm?.addEventListener('submit', async (event) => {
-    event.preventDefault()
-
-    const nameInput = document.querySelector<HTMLInputElement>('#serviceName')
-    const priceInput = document.querySelector<HTMLInputElement>('#servicePrice')
-
-    if (!nameInput || !priceInput) return
-
-    try {
-      await createService({
-        nombre: nameInput.value,
-        precioBase: Number(priceInput.value)
-      })
-
-      await loadServicesData()
-      renderApp()
-      showMessage('Servicio guardado correctamente')
-    } catch (error) {
-      showMessage('Error al guardar el servicio')
-    }
-  })
-
-  const expenseForm = document.querySelector<HTMLFormElement>('#expenseForm')
-
-  expenseForm?.addEventListener('submit', async (event) => {
-    event.preventDefault()
-
-    const categoryInput = document.querySelector<HTMLSelectElement>('#expenseCategory')
-    const descriptionInput = document.querySelector<HTMLInputElement>('#expenseDescription')
-    const amountInput = document.querySelector<HTMLInputElement>('#expenseAmount')
-    const paymentMethodInput = document.querySelector<HTMLSelectElement>('#expensePaymentMethod')
-    const dateInput = document.querySelector<HTMLInputElement>('#expenseDate')
-    const observationInput = document.querySelector<HTMLTextAreaElement>('#expenseObservation')
-
-    if (
-      !categoryInput ||
-      !descriptionInput ||
-      !amountInput ||
-      !paymentMethodInput ||
-      !dateInput ||
-      !observationInput
-    ) {
-      return
-    }
-
-    try {
-      await createExpense({
-        categoria: categoryInput.value as ExpenseCategory,
-        descripcion: descriptionInput.value,
-        monto: Number(amountInput.value),
-        metodoPago: paymentMethodInput.value,
-        fecha: dateInput.value,
-        observacion: observationInput.value
-      })
-
-      await loadExpensesData()
-      await loadDashboardData()
-
-      renderApp()
-      showMessage('Gasto guardado correctamente')
-    } catch (error) {
-      showMessage('Error al guardar el gasto')
-    }
-  })
-
-  const deleteExpenseButtons = document.querySelectorAll<HTMLButtonElement>('.delete-expense-button')
-
-  deleteExpenseButtons.forEach((button) => {
-    button.addEventListener('click', async () => {
-      const expenseId = Number(button.dataset.id)
-
-      const confirmDelete = confirm('¿Seguro que querés eliminar este gasto?')
-
-      if (!confirmDelete) return
-
-      try {
-        await deleteExpense(expenseId)
-
-        await loadExpensesData()
-        await loadDashboardData()
-
-        renderApp()
-        showMessage('Gasto eliminado correctamente')
-      } catch (error) {
-        showMessage('No se pudo eliminar el gasto')
-      }
-    })
-  })
-
-  const cutForm = document.querySelector<HTMLFormElement>('#cutForm')
-
-  cutForm?.addEventListener('submit', async (event) => {
-    event.preventDefault()
-
-    const barberSelect = document.querySelector<HTMLSelectElement>('#barberId')
-    const serviceSelect = document.querySelector<HTMLSelectElement>('#serviceId')
-    const amountInput = document.querySelector<HTMLInputElement>('#cutAmount')
-    const paymentSelect = document.querySelector<HTMLSelectElement>('#paymentMethod')
-    const observationInput = document.querySelector<HTMLTextAreaElement>('#cutObservation')
-
-    if (!barberSelect || !serviceSelect || !amountInput || !paymentSelect || !observationInput) {
-      return
-    }
-
-    try {
-      await createCut({
-        barberId: Number(barberSelect.value),
-        serviceId: Number(serviceSelect.value),
-        monto: Number(amountInput.value),
-        metodoPago: paymentSelect.value,
-        observacion: observationInput.value
-      })
-
-      await loadDashboardData()
-      await loadCutsData()
-
-      if (currentView === 'barberos') {
-        await loadBarbersData()
-      }
-
-      if (currentView === 'servicios') {
-        await loadServicesData()
-      }
-
-      if (currentView === 'gastos') {
-        await loadExpensesData()
-      }
-
-      renderApp()
-      showMessage('Corte registrado correctamente')
-    } catch (error) {
-      showMessage('Error al registrar el corte')
-    }
+    render()
   })
 }
 
-const initApp = async () => {
+const init = async () => {
+  if (!getToken()) {
+    state.user = null
+    renderLogin()
+    return
+  }
+
+  if (app) app.innerHTML = `<h2 style="padding:20px">Cargando...</h2>`
+
   try {
-    renderLoading()
-
-    await loadDashboardData()
-    await loadBarbersData()
-    await loadServicesData()
-    await loadExpensesData()
-
-    renderApp()
-  } catch (error) {
-    if (!app) return
-
-    app.innerHTML = `
-      <main class="layout">
-        <section class="panel">
-          <h1>Error al cargar la app</h1>
-          <p class="empty">Revisá que el backend esté prendido en http://localhost:3000.</p>
-        </section>
-      </main>
-    `
+    await loadAll()
+    render()
+  } catch {
+    clearSession()
+    state.user = null
+    renderLogin()
   }
 }
 
-initApp()
+init()

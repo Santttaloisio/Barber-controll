@@ -1,120 +1,67 @@
 import { Request, Response } from 'express'
-import { Expense } from '../models'
+import { supabase } from '../db/supabase'
+import { invalidateAppDataCache } from '../services/appData.service'
+import { isMissingColumnError, missingMigrationResponse } from '../utils/schemaError'
 
-const allowedCategories = [
-  'Servicios',
-  'Gastos barbería',
-  'Gastos varios'
-]
+export const getExpenses = async (_req: Request, res: Response) => {
+  const { data, error } = await supabase.from('expenses').select('*')
 
-export const getExpenses = async (req: Request, res: Response) => {
-  try {
-    const expenses = await Expense.findAll({
-      order: [['fecha', 'DESC']]
-    })
-
-    res.json(expenses)
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al obtener los gastos',
-      error
-    })
+  if (error) {
+    if (isMissingColumnError(error)) return missingMigrationResponse(res, 'expenses')
+    return res.status(500).json({ error })
   }
+
+  return res.json(data)
 }
 
 export const createExpense = async (req: Request, res: Response) => {
-  try {
-    const {
-      categoria,
-      descripcion,
-      monto,
-      metodoPago,
-      fecha,
-      observacion
-    } = req.body
+  const {
+    category,
+    categoria,
+    description,
+    descripcion,
+    amount,
+    monto,
+    paymentMethod,
+    metodoPago,
+    date,
+    fecha,
+    observation,
+    observacion
+  } = req.body
 
-    const cleanCategory = String(categoria ?? '').trim()
-    const cleanDescription = String(descripcion ?? '').trim()
-    const cleanPaymentMethod = String(metodoPago ?? '').trim()
-    const cleanObservation = String(observacion ?? '').trim()
-    const amountNumber = Number(monto)
-
-    if (!allowedCategories.includes(cleanCategory)) {
-      return res.status(400).json({
-        message: 'La categoría no es válida'
-      })
-    }
-
-    if (!cleanDescription) {
-      return res.status(400).json({
-        message: 'La descripción es obligatoria'
-      })
-    }
-
-    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-      return res.status(400).json({
-        message: 'El monto no es válido'
-      })
-    }
-
-    if (!cleanPaymentMethod) {
-      return res.status(400).json({
-        message: 'El método de pago es obligatorio'
-      })
-    }
-
-    const expenseDate = fecha
-      ? new Date(`${fecha}T12:00:00`)
-      : new Date()
-
-    const newExpense = await Expense.create({
-      categoria: cleanCategory,
-      descripcion: cleanDescription,
-      monto: amountNumber,
-      metodoPago: cleanPaymentMethod,
-      fecha: expenseDate,
-      observacion: cleanObservation || null
-    })
-
-    res.status(201).json({
-      message: 'Gasto registrado correctamente',
-      expense: newExpense
-    })
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al registrar el gasto',
-      error
-    })
+  const payload = {
+    category: category ?? categoria,
+    description: description ?? descripcion,
+    amount: amount ?? monto,
+    payment_method: paymentMethod ?? metodoPago,
+    date: date ?? fecha,
+    observation: observation ?? observacion
   }
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert([payload])
+    .select()
+
+  if (error) return res.status(500).json({ error })
+
+  invalidateAppDataCache()
+
+  return res.json(data?.[0])
 }
 
 export const deleteExpense = async (req: Request, res: Response) => {
-  try {
-    const expenseId = Number(req.params.id)
+  const { id } = req.params
 
-    if (!Number.isInteger(expenseId) || expenseId <= 0) {
-      return res.status(400).json({
-        message: 'El id del gasto no es válido'
-      })
-    }
+  const { error } = await supabase
+    .from('expenses')
+    .delete()
+    .eq('id', id)
 
-    const expense = await Expense.findByPk(expenseId)
+  if (error) return res.status(500).json({ error })
 
-    if (!expense) {
-      return res.status(404).json({
-        message: 'Gasto no encontrado'
-      })
-    }
+  invalidateAppDataCache()
 
-    await expense.destroy()
-
-    res.json({
-      message: 'Gasto eliminado correctamente'
-    })
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al eliminar el gasto',
-      error
-    })
-  }
+  return res.json({ message: 'Expense deleted' })
 }

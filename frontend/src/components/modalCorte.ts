@@ -2,6 +2,8 @@ import type { Barber, Service } from '../types'
 import { formatMoney } from '../utils/formatters'
 
 export const renderCutModal = (barbers: Barber[], services: Service[]) => {
+  const activeBarbers = barbers.filter((barber) => barber.activo)
+
   return `
     <button id="openCutModal" class="floating-button">+</button>
 
@@ -20,7 +22,7 @@ export const renderCutModal = (barbers: Barber[], services: Service[]) => {
           <label for="barberId">Barbero</label>
           <select id="barberId" required>
             <option value="">Seleccionar barbero</option>
-            ${barbers.map((barber) => {
+            ${activeBarbers.map((barber) => {
               return `<option value="${barber.id}">${barber.nombre}</option>`
             }).join('')}
           </select>

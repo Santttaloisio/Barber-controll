@@ -1,130 +1,49 @@
 import { Request, Response } from 'express'
-import { Service, Cut } from '../models'
+import { supabase } from '../db/supabase'
+import { invalidateAppDataCache } from '../services/appData.service'
 
-export const getServices = async (req: Request, res: Response) => {
-  try {
-    const services = await Service.findAll({
-      order: [['id', 'ASC']]
-    })
+export const getServices = async (_req: Request, res: Response) => {
+  const { data, error } = await supabase.from('services').select('*')
 
-    res.json(services)
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al obtener los servicios',
-      error
-    })
-  }
+  if (error) return res.status(500).json({ error })
+
+  return res.json(data)
 }
 
 export const createService = async (req: Request, res: Response) => {
-  try {
-    const { nombre, precioBase } = req.body
+  const { name, nombre, price, precioBase } = req.body
 
-    if (!nombre || !precioBase) {
-      return res.status(400).json({
-        message: 'El nombre y el precio base son obligatorios'
-      })
-    }
+  const { data, error } = await supabase
+    .from('services')
+    .insert([{
+      name: name ?? nombre,
+      price: price ?? precioBase
+    }])
+    .select()
 
-    const newService = await Service.create({
-      nombre,
-      precioBase
-    })
+  if (error) return res.status(500).json({ error })
 
-    res.status(201).json({
-      message: 'Servicio creado correctamente',
-      service: newService
-    })
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al crear el servicio',
-      error
-    })
-  }
+  invalidateAppDataCache()
+
+  return res.json(data?.[0])
 }
 
-export const updateServicePrice = async (req: Request, res: Response) => {
-  try {
-    const serviceId = Number(req.params.id)
-    const { precioBase } = req.body
+export const updateService = async (req: Request, res: Response) => {
+  const { id } = req.params
+  const { name, nombre, price, precioBase } = req.body
 
-    if (!Number.isInteger(serviceId) || serviceId <= 0) {
-      return res.status(400).json({
-        message: 'El id del servicio no es válido'
-      })
-    }
-
-    const priceNumber = Number(precioBase)
-
-    if (!Number.isFinite(priceNumber) || priceNumber <= 0) {
-      return res.status(400).json({
-        message: 'El precio no es válido'
-      })
-    }
-
-    const service = await Service.findByPk(serviceId)
-
-    if (!service) {
-      return res.status(404).json({
-        message: 'Servicio no encontrado'
-      })
-    }
-
-    await service.update({
-      precioBase: priceNumber
+  const { data, error } = await supabase
+    .from('services')
+    .update({
+      name: name ?? nombre,
+      price: price ?? precioBase
     })
+    .eq('id', id)
+    .select()
 
-    res.json({
-      message: 'Precio actualizado correctamente',
-      service
-    })
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al actualizar el precio del servicio',
-      error
-    })
-  }
-}
+  if (error) return res.status(500).json({ error })
 
-export const deleteService = async (req: Request, res: Response) => {
-  try {
-    const serviceId = Number(req.params.id)
+  invalidateAppDataCache()
 
-    if (!Number.isInteger(serviceId) || serviceId <= 0) {
-      return res.status(400).json({
-        message: 'El id del servicio no es válido'
-      })
-    }
-
-    const service = await Service.findByPk(serviceId)
-
-    if (!service) {
-      return res.status(404).json({
-        message: 'Servicio no encontrado'
-      })
-    }
-
-    const cutsCount = await Cut.count({
-      where: {
-        serviceId
-      }
-    })
-
-    if (cutsCount > 0) {
-      return res.status(400).json({
-        message: 'No se puede borrar el servicio porque ya tiene cortes registrados'
-      })
-    }
-
-    await service.destroy()
-
-    res.json({
-      message: 'Servicio eliminado correctamente'
-    })
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al eliminar el servicio',
-      error
-    })
-  }
+  return res.json(data?.[0])
 }

@@ -15,6 +15,41 @@ body {
   padding: 32px 0;
 }
 
+.login-page {
+  min-height: 100vh;
+  width: min(440px, 92%);
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.login-card {
+  width: 100%;
+}
+
+.login-card h1 {
+  margin: 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #cfcfcf;
+}
+
+.topbar button {
+  background: transparent;
+  color: #c8a45d;
+  border: 1px solid #6b572d;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
 .hero {
   background: linear-gradient(135deg, #222222, #171717);
   border: 1px solid #2f2f2f;

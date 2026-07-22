@@ -1,30 +1,38 @@
 import express from 'express'
 import cors from 'cors'
 import path from 'path'
+import fs from 'fs'
 
-import cutRoutes from './routes/cut.routes'
 import barberRoutes from './routes/barber.routes'
+import cutRoutes from './routes/cut.routes'
 import serviceRoutes from './routes/service.routes'
-import reportRoutes from './routes/report.routes'
 import expenseRoutes from './routes/expense.routes'
+import reportRoutes from './routes/report.routes'
+import bootstrapRoutes from './routes/bootstrap.routes'
+import authRoutes from './routes/auth.routes'
+import { requireAuth } from './middlewares/auth.middleware'
 
 const app = express()
 
 app.use(cors())
 app.use(express.json())
 
-app.use('/api/cortes', cutRoutes)
-app.use('/api/barberos', barberRoutes)
-app.use('/api/servicios', serviceRoutes)
-app.use('/api/reportes', reportRoutes)
-app.use('/api/gastos', expenseRoutes)
+app.use('/api/auth', authRoutes)
+app.use('/api', requireAuth)
+app.use('/api/barbers', barberRoutes)
+app.use('/api/cuts', cutRoutes)
+app.use('/api/services', serviceRoutes)
+app.use('/api/expenses', expenseRoutes)
+app.use('/api/reports', reportRoutes)
+app.use('/api/bootstrap', bootstrapRoutes)
 
-const frontendPath = path.resolve(process.cwd(), '../frontend/dist')
+const frontendDist = path.resolve(__dirname, '../../frontend/dist')
 
-app.use(express.static(frontendPath))
-
-app.get(/^\/(?!api).*/, (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'))
-})
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist))
+  app.get(/.*/, (_req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'))
+  })
+}
 
 export default app

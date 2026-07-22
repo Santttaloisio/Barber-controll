@@ -1,99 +1,54 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteBarber = exports.createBarber = exports.getBarbers = void 0;
-const models_1 = require("../models");
-const getBarbers = async (req, res) => {
-    try {
-        const barbers = await models_1.Barber.findAll({
-            where: {
-                activo: true
-            },
-            order: [['id', 'ASC']]
-        });
-        res.json(barbers);
-    }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error al obtener los barberos',
-            error
-        });
-    }
+const supabase_1 = require("../db/supabase");
+const appData_service_1 = require("../services/appData.service");
+const schemaError_1 = require("../utils/schemaError");
+const getBarbers = async (_req, res) => {
+    const { data, error } = await supabase_1.supabase
+        .from('barbers')
+        .select('*');
+    if (error)
+        return res.status(500).json({ error });
+    return res.json(data);
 };
 exports.getBarbers = getBarbers;
 const createBarber = async (req, res) => {
-    try {
-        const { nombre } = req.body;
-        const cleanName = String(nombre ?? '').trim();
-        if (!cleanName) {
-            return res.status(400).json({
-                message: 'El nombre es obligatorio'
-            });
+    const { name, nombre } = req.body;
+    const { data, error } = await supabase_1.supabase
+        .from('barbers')
+        .insert([{ name: name ?? nombre, active: true }])
+        .select();
+    if (error) {
+        if ((0, schemaError_1.isMissingColumnError)(error)) {
+            const fallback = await supabase_1.supabase
+                .from('barbers')
+                .insert([{ name: name ?? nombre }])
+                .select();
+            if (fallback.error)
+                return res.status(500).json({ error: fallback.error });
+            (0, appData_service_1.invalidateAppDataCache)();
+            return res.json(fallback.data?.[0]);
         }
-        const normalizedName = cleanName.toLowerCase();
-        const allBarbers = await models_1.Barber.findAll();
-        const existingBarber = allBarbers.find((barber) => {
-            const barberName = String(barber.get('nombre') ?? '').trim().toLowerCase();
-            return barberName === normalizedName;
-        });
-        if (existingBarber) {
-            const isActive = Boolean(existingBarber.get('activo'));
-            if (isActive) {
-                return res.status(400).json({
-                    message: 'Ya existe un barbero activo con ese nombre'
-                });
-            }
-            await existingBarber.update({
-                activo: true,
-                nombre: cleanName
-            });
-            return res.json({
-                message: 'Barbero reactivado correctamente',
-                barber: existingBarber
-            });
-        }
-        const newBarber = await models_1.Barber.create({
-            nombre: cleanName,
-            activo: true
-        });
-        res.status(201).json({
-            message: 'Barbero creado correctamente',
-            barber: newBarber
-        });
+        return res.status(500).json({ error });
     }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error al crear el barbero',
-            error
-        });
-    }
+    (0, appData_service_1.invalidateAppDataCache)();
+    return res.json(data?.[0]);
 };
 exports.createBarber = createBarber;
 const deleteBarber = async (req, res) => {
-    try {
-        const barberId = Number(req.params.id);
-        if (!Number.isInteger(barberId) || barberId <= 0) {
-            return res.status(400).json({
-                message: 'El id del barbero no es válido'
-            });
-        }
-        const barber = await models_1.Barber.findByPk(barberId);
-        if (!barber) {
-            return res.status(404).json({
-                message: 'Barbero no encontrado'
-            });
-        }
-        await barber.update({
-            activo: false
-        });
-        res.json({
-            message: 'Barbero eliminado correctamente'
-        });
+    const { id } = req.params;
+    const { data, error } = await supabase_1.supabase
+        .from('barbers')
+        .update({ active: false })
+        .eq('id', id)
+        .select();
+    if (error) {
+        if ((0, schemaError_1.isMissingColumnError)(error))
+            return (0, schemaError_1.missingMigrationResponse)(res, 'barbers');
+        return res.status(500).json({ error });
     }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error al eliminar el barbero',
-            error
-        });
-    }
+    (0, appData_service_1.invalidateAppDataCache)();
+    return res.json(data?.[0]);
 };
 exports.deleteBarber = deleteBarber;

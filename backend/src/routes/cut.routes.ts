@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getCuts, createCut } from '../controllers/cut.controller'
+import { createCut, getCuts } from '../controllers/cut.controller'
 
 const router = Router()
 

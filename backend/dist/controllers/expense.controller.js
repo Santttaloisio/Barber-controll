@@ -1,103 +1,48 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteExpense = exports.createExpense = exports.getExpenses = void 0;
-const models_1 = require("../models");
-const allowedCategories = [
-    'Servicios',
-    'Gastos barbería',
-    'Gastos varios'
-];
-const getExpenses = async (req, res) => {
-    try {
-        const expenses = await models_1.Expense.findAll({
-            order: [['fecha', 'DESC']]
-        });
-        res.json(expenses);
+const supabase_1 = require("../db/supabase");
+const appData_service_1 = require("../services/appData.service");
+const schemaError_1 = require("../utils/schemaError");
+const getExpenses = async (_req, res) => {
+    const { data, error } = await supabase_1.supabase.from('expenses').select('*');
+    if (error) {
+        if ((0, schemaError_1.isMissingColumnError)(error))
+            return (0, schemaError_1.missingMigrationResponse)(res, 'expenses');
+        return res.status(500).json({ error });
     }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error al obtener los gastos',
-            error
-        });
-    }
+    return res.json(data);
 };
 exports.getExpenses = getExpenses;
 const createExpense = async (req, res) => {
-    try {
-        const { categoria, descripcion, monto, metodoPago, fecha, observacion } = req.body;
-        const cleanCategory = String(categoria ?? '').trim();
-        const cleanDescription = String(descripcion ?? '').trim();
-        const cleanPaymentMethod = String(metodoPago ?? '').trim();
-        const cleanObservation = String(observacion ?? '').trim();
-        const amountNumber = Number(monto);
-        if (!allowedCategories.includes(cleanCategory)) {
-            return res.status(400).json({
-                message: 'La categoría no es válida'
-            });
-        }
-        if (!cleanDescription) {
-            return res.status(400).json({
-                message: 'La descripción es obligatoria'
-            });
-        }
-        if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-            return res.status(400).json({
-                message: 'El monto no es válido'
-            });
-        }
-        if (!cleanPaymentMethod) {
-            return res.status(400).json({
-                message: 'El método de pago es obligatorio'
-            });
-        }
-        const expenseDate = fecha
-            ? new Date(`${fecha}T12:00:00`)
-            : new Date();
-        const newExpense = await models_1.Expense.create({
-            categoria: cleanCategory,
-            descripcion: cleanDescription,
-            monto: amountNumber,
-            metodoPago: cleanPaymentMethod,
-            fecha: expenseDate,
-            observacion: cleanObservation || null
-        });
-        res.status(201).json({
-            message: 'Gasto registrado correctamente',
-            expense: newExpense
-        });
-    }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error al registrar el gasto',
-            error
-        });
-    }
+    const { category, categoria, description, descripcion, amount, monto, paymentMethod, metodoPago, date, fecha, observation, observacion } = req.body;
+    const payload = {
+        category: category ?? categoria,
+        description: description ?? descripcion,
+        amount: amount ?? monto,
+        payment_method: paymentMethod ?? metodoPago,
+        date: date ?? fecha,
+        observation: observation ?? observacion
+    };
+    const { data, error } = await supabase_1.supabase
+        .from('expenses')
+        .insert([payload])
+        .select();
+    if (error)
+        return res.status(500).json({ error });
+    (0, appData_service_1.invalidateAppDataCache)();
+    return res.json(data?.[0]);
 };
 exports.createExpense = createExpense;
 const deleteExpense = async (req, res) => {
-    try {
-        const expenseId = Number(req.params.id);
-        if (!Number.isInteger(expenseId) || expenseId <= 0) {
-            return res.status(400).json({
-                message: 'El id del gasto no es válido'
-            });
-        }
-        const expense = await models_1.Expense.findByPk(expenseId);
-        if (!expense) {
-            return res.status(404).json({
-                message: 'Gasto no encontrado'
-            });
-        }
-        await expense.destroy();
-        res.json({
-            message: 'Gasto eliminado correctamente'
-        });
-    }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error al eliminar el gasto',
-            error
-        });
-    }
+    const { id } = req.params;
+    const { error } = await supabase_1.supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+    if (error)
+        return res.status(500).json({ error });
+    (0, appData_service_1.invalidateAppDataCache)();
+    return res.json({ message: 'Expense deleted' });
 };
 exports.deleteExpense = deleteExpense;

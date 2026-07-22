@@ -1,4 +1,4 @@
-import type { Cut } from '../types'
+import type { Barber, Cut, Service } from '../types'
 import { formatDate, formatMoney } from '../utils/formatters'
 
 export type CutFilters = {
@@ -13,23 +13,6 @@ const defaultFilters: CutFilters = {
   toDate: '',
   barberId: '',
   paymentMethod: ''
-}
-
-const getUniqueBarbers = (cuts: Cut[]) => {
-  const barbersMap = new Map<number, string>()
-
-  cuts.forEach((cut) => {
-    if (cut.Barber) {
-      barbersMap.set(cut.Barber.id, cut.Barber.nombre)
-    }
-  })
-
-  return Array.from(barbersMap.entries()).map(([id, nombre]) => {
-    return {
-      id,
-      nombre
-    }
-  })
 }
 
 const getUniquePaymentMethods = (cuts: Cut[]) => {
@@ -73,11 +56,14 @@ const filterCuts = (cuts: Cut[], filters: CutFilters) => {
 
 export const renderCutsView = (
   cuts: Cut[],
+  barbers: Barber[],
+  services: Service[],
   filters: CutFilters = defaultFilters
 ) => {
   const filteredCuts = filterCuts(cuts, filters)
-  const barbers = getUniqueBarbers(cuts)
   const paymentMethods = getUniquePaymentMethods(cuts)
+  const barbersById = new Map(barbers.map((barber) => [barber.id, barber]))
+  const servicesById = new Map(services.map((service) => [service.id, service]))
 
   const totalFiltered = filteredCuts.reduce((total, cut) => {
     return total + Number(cut.monto)
@@ -167,8 +153,12 @@ export const renderCutsView = (
           filteredCuts.length === 0
             ? `<p class="empty">No hay cortes que coincidan con los filtros.</p>`
             : filteredCuts.map((cut) => {
-                const barberName = cut.Barber?.nombre ?? 'Sin barbero'
-                const serviceName = cut.Service?.nombre ?? 'Sin servicio'
+                const barberName = cut.Barber?.nombre
+                  ?? barbersById.get(cut.barberId)?.nombre
+                  ?? 'Sin barbero'
+                const serviceName = cut.Service?.nombre
+                  ?? servicesById.get(cut.serviceId)?.nombre
+                  ?? 'Sin servicio'
                 const observation = cut.observacion?.trim()
 
                 return `

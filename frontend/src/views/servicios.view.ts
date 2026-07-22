@@ -44,7 +44,7 @@ export const renderServicesView = (services: Service[]) => {
                           data-name="${service.nombre}"
                           data-price="${service.precioBase}"
                         >
-                          Editar precio
+                          Editar
                         </button>
                       </div>
                     </article>

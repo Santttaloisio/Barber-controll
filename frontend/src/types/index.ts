@@ -41,11 +41,21 @@ export type PaymentMethodReport = {
   facturacion: number
 }
 
+export type TodayCutReport = {
+  id: number
+  barberId: number
+  nombreBarbero: string
+  monto: number
+  metodoPago: string
+  fecha: string
+}
+
 export type DashboardReport = {
   hoy: {
     cortes: number
     facturacion: number
     porMetodoPago: PaymentMethodReport[]
+    detalle: TodayCutReport[]
   }
   mes: {
     cortes: number
@@ -140,6 +150,26 @@ export type YearReport = {
   cortes: number
   facturacion: number
   porMes: MonthResume[]
+}
+
+export type BootstrapData = {
+  dashboard: DashboardReport
+  month: MonthReport
+  year: YearReport
+  cuts: Cut[]
+  barbers: Barber[]
+  services: Service[]
+  expenses: Expense[]
+}
+
+export type User = {
+  email: string
+  name: string
+}
+
+export type LoginResponse = {
+  token: string
+  user: User
 }
 
 export type DashboardChartMode = 'month' | 'year'
