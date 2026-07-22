@@ -21,12 +21,12 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@supabase/supabase-js": "...",
-    "cors": "...",
-    "dotenv": "...",
-    "express": "...",
-    "pg": "...",
-    "sqlite3": "..."
+    "@supabase/supabase-js": "file:...",
+    "cors": "file:...",
+    "dotenv": "file:...",
+    "express": "file:...",
+    "pg": "file:...",
+    "sqlite3": "file:..."
   },
   "engines": {
     "node": "18.x"
