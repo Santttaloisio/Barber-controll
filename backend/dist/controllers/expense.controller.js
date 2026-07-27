@@ -3,15 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteExpense = exports.createExpense = exports.getExpenses = void 0;
 const supabase_1 = require("../db/supabase");
 const appData_service_1 = require("../services/appData.service");
-const schemaError_1 = require("../utils/schemaError");
 const getExpenses = async (_req, res) => {
-    const { data, error } = await supabase_1.supabase.from('expenses').select('*');
-    if (error) {
-        if ((0, schemaError_1.isMissingColumnError)(error))
-            return (0, schemaError_1.missingMigrationResponse)(res, 'expenses');
+    try {
+        const data = await (0, appData_service_1.getAppData)();
+        return res.json(data.expenses);
+    }
+    catch (error) {
         return res.status(500).json({ error });
     }
-    return res.json(data);
 };
 exports.getExpenses = getExpenses;
 const createExpense = async (req, res) => {

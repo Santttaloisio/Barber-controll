@@ -49,7 +49,7 @@ const getUniquePaymentMethods = (expenses: Expense[]) => {
     }
   })
 
-  return Array.from(paymentMethods)
+  return Array.from(paymentMethods).sort((a, b) => a.localeCompare(b))
 }
 
 const filterExpenses = (

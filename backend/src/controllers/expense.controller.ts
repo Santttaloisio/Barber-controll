@@ -1,17 +1,15 @@
 import { Request, Response } from 'express'
 import { supabase } from '../db/supabase'
-import { invalidateAppDataCache } from '../services/appData.service'
+import { getAppData, invalidateAppDataCache } from '../services/appData.service'
 import { isMissingColumnError, missingMigrationResponse } from '../utils/schemaError'
 
 export const getExpenses = async (_req: Request, res: Response) => {
-  const { data, error } = await supabase.from('expenses').select('*')
-
-  if (error) {
-    if (isMissingColumnError(error)) return missingMigrationResponse(res, 'expenses')
+  try {
+    const data = await getAppData()
+    return res.json(data.expenses)
+  } catch (error) {
     return res.status(500).json({ error })
   }
-
-  return res.json(data)
 }
 
 export const createExpense = async (req: Request, res: Response) => {

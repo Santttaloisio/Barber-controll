@@ -1,13 +1,14 @@
 import { Request, Response } from 'express'
 import { supabase } from '../db/supabase'
-import { invalidateAppDataCache } from '../services/appData.service'
+import { getAppData, invalidateAppDataCache } from '../services/appData.service'
 
 export const getServices = async (_req: Request, res: Response) => {
-  const { data, error } = await supabase.from('services').select('*')
-
-  if (error) return res.status(500).json({ error })
-
-  return res.json(data)
+  try {
+    const data = await getAppData()
+    return res.json(data.services)
+  } catch (error) {
+    return res.status(500).json({ error })
+  }
 }
 
 export const createService = async (req: Request, res: Response) => {

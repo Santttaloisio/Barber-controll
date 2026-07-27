@@ -132,9 +132,31 @@ export const renderDashboardView = (
     <section class="dashboard-main-grid">
 
       <article class="panel">
-        <h2>
-          ${chartMode === 'month' ? 'Facturacion mensual' : 'Facturacion anual'}
-        </h2>
+        <div class="panel-header panel-header-row">
+          <div>
+            <h2>
+              ${chartMode === 'month' ? 'Facturacion mensual' : 'Facturacion anual'}
+            </h2>
+          </div>
+
+          <div class="chart-mode-actions">
+            <button 
+              type="button" 
+              class="chart-mode-button ${chartMode === 'month' ? 'active' : ''}"
+              data-chart-mode="month"
+            >
+              Mes
+            </button>
+
+            <button 
+              type="button" 
+              class="chart-mode-button ${chartMode === 'year' ? 'active' : ''}"
+              data-chart-mode="year"
+            >
+              Año
+            </button>
+          </div>
+        </div>
 
         <div class="chart">
           ${
@@ -146,8 +168,36 @@ export const renderDashboardView = (
       </article>
 
       <article class="panel">
-        <h2>${getSummaryTitle(summaryMode)}</h2>
-        <p>${getSummaryDescription(summaryMode)}</p>
+        <div class="panel-header">
+          <h2>${getSummaryTitle(summaryMode)}</h2>
+          <p>${getSummaryDescription(summaryMode)}</p>
+
+          <div class="summary-mode-actions">
+            <button
+              type="button"
+              class="summary-mode-button ${summaryMode === 'payments' ? 'active' : ''}"
+              data-summary-mode="payments"
+            >
+              Cortes
+            </button>
+
+            <button
+              type="button"
+              class="summary-mode-button ${summaryMode === 'barbers' ? 'active' : ''}"
+              data-summary-mode="barbers"
+            >
+              Barberos
+            </button>
+
+            <button
+              type="button"
+              class="summary-mode-button ${summaryMode === 'expenses' ? 'active' : ''}"
+              data-summary-mode="expenses"
+            >
+              Gastos
+            </button>
+          </div>
+        </div>
 
         <div class="barber-list">
           ${

@@ -24,7 +24,24 @@ const getUniquePaymentMethods = (cuts: Cut[]) => {
     }
   })
 
-  return Array.from(paymentMethods)
+  return Array.from(paymentMethods).sort((a, b) => a.localeCompare(b))
+}
+
+const getFilterBarbers = (cuts: Cut[], barbers: Barber[]) => {
+  const barbersById = new Map<number, Barber>()
+
+  barbers.forEach((barber) => {
+    barbersById.set(barber.id, barber)
+  })
+
+  cuts.forEach((cut) => {
+    if (cut.Barber) {
+      barbersById.set(cut.Barber.id, cut.Barber)
+    }
+  })
+
+  return Array.from(barbersById.values())
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
 }
 
 const filterCuts = (cuts: Cut[], filters: CutFilters) => {
@@ -62,6 +79,7 @@ export const renderCutsView = (
 ) => {
   const filteredCuts = filterCuts(cuts, filters)
   const paymentMethods = getUniquePaymentMethods(cuts)
+  const filterBarbers = getFilterBarbers(cuts, barbers)
   const barbersById = new Map(barbers.map((barber) => [barber.id, barber]))
   const servicesById = new Map(services.map((service) => [service.id, service]))
 
@@ -100,7 +118,7 @@ export const renderCutsView = (
             <label for="cutFilterBarber">Barbero</label>
             <select id="cutFilterBarber">
               <option value="">Todos</option>
-              ${barbers.map((barber) => {
+              ${filterBarbers.map((barber) => {
                 return `
                   <option 
                     value="${barber.id}" 

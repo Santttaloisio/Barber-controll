@@ -4,10 +4,13 @@ exports.updateService = exports.createService = exports.getServices = void 0;
 const supabase_1 = require("../db/supabase");
 const appData_service_1 = require("../services/appData.service");
 const getServices = async (_req, res) => {
-    const { data, error } = await supabase_1.supabase.from('services').select('*');
-    if (error)
+    try {
+        const data = await (0, appData_service_1.getAppData)();
+        return res.json(data.services);
+    }
+    catch (error) {
         return res.status(500).json({ error });
-    return res.json(data);
+    }
 };
 exports.getServices = getServices;
 const createService = async (req, res) => {

@@ -219,6 +219,20 @@ const setupEvents = () => {
     })
   })
 
+  document.querySelectorAll<HTMLButtonElement>('[data-chart-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.chartMode = button.dataset.chartMode as DashboardChartMode
+      render()
+    })
+  })
+
+  document.querySelectorAll<HTMLButtonElement>('[data-summary-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.summaryMode = button.dataset.summaryMode as DashboardSummaryMode
+      render()
+    })
+  })
+
   document.querySelector<HTMLFormElement>('#barberForm')?.addEventListener('submit', async (event) => {
     event.preventDefault()
 
