@@ -149,7 +149,9 @@ const buildDashboard = (cuts, expenses, barbersById) => {
             detalle: todayCuts.map((cut) => ({
                 id: cut.id,
                 barberId: cut.barberId,
+                serviceId: cut.serviceId,
                 nombreBarbero: cut.Barber?.nombre ?? barbersById.get(cut.barberId)?.nombre ?? 'Sin barbero',
+                nombreServicio: cut.Service?.nombre ?? 'Sin servicio',
                 monto: cut.monto,
                 metodoPago: cut.metodoPago,
                 fecha: cut.fecha

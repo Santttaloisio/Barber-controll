@@ -44,7 +44,9 @@ export type PaymentMethodReport = {
 export type TodayCutReport = {
   id: number
   barberId: number
+  serviceId: number
   nombreBarbero: string
+  nombreServicio: string
   monto: number
   metodoPago: string
   fecha: string

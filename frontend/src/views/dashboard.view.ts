@@ -25,8 +25,8 @@ const renderTodayCuts = (cuts?: TodayCutReport[]) => {
   return data.map((cut) => `
     <article class="barber-item">
       <div>
-        <h3>${cut.nombreBarbero ?? 'Sin nombre'}</h3>
-        <p>${cut.metodoPago ?? 'Sin metodo'}</p>
+        <h3>${cut.nombreServicio ?? 'Sin servicio'}</h3>
+        <p>${cut.nombreBarbero ?? 'Sin barbero'} · ${cut.metodoPago ?? 'Sin metodo'}</p>
       </div>
       <strong>${formatMoney(cut.monto ?? 0)}</strong>
     </article>
