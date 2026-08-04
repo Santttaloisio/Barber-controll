@@ -1,8 +1,13 @@
 alter table public.cuts
   add column if not exists payment_method text,
-  add column if not exists observation text;
+  add column if not exists observation text,
+  add column if not exists service_name_snapshot text,
+  add column if not exists service_price_snapshot numeric;
 
 alter table public.barbers
+  add column if not exists active boolean not null default true;
+
+alter table public.services
   add column if not exists active boolean not null default true;
 
 alter table public.expenses

@@ -10,6 +10,7 @@ export type Service = {
   id: number
   nombre: string
   precioBase: number
+  activo: boolean
   createdAt?: string
   updatedAt?: string
 }

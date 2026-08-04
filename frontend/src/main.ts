@@ -325,7 +325,17 @@ const setupEvents = () => {
     const observacion = document.querySelector<HTMLTextAreaElement>('#cutObservation')?.value.trim()
     if (!barberId || !serviceId || monto <= 0 || !metodoPago) return
 
-    await createCut({ barberId, serviceId, monto, metodoPago, observacion })
+    const service = state.services.find((item) => item.id === serviceId)
+
+    await createCut({
+      barberId,
+      serviceId,
+      monto,
+      metodoPago,
+      observacion,
+      serviceName: service?.nombre,
+      servicePrice: service?.precioBase
+    })
     await reloadAndRender()
     showMessage('Corte registrado')
   })
@@ -428,10 +438,11 @@ const init = async () => {
   try {
     await loadAll()
     render()
-  } catch {
+  } catch (error) {
     clearSession()
     state.user = null
     renderLogin()
+    showMessage(error instanceof Error ? error.message : 'No se pudieron cargar los datos')
   }
 }
 

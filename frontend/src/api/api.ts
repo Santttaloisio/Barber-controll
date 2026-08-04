@@ -76,7 +76,16 @@ export const clearSession = () => {
 }
 
 const assertSupabase = ({ error }: { error: any }) => {
-  if (error) throw new Error(error.message ?? 'Error de Supabase')
+  if (!error) return
+
+  const details = [
+    error.message,
+    error.details,
+    error.hint,
+    error.code ? `Codigo: ${error.code}` : null
+  ].filter(Boolean)
+
+  throw new Error(details.join(' - ') || 'Error de Supabase')
 }
 
 const normalizeBarber = (barber: any): Barber => ({
@@ -91,6 +100,7 @@ const normalizeService = (service: any): Service => ({
   id: toNumber(service.id),
   nombre: toText(service.nombre ?? service.name, 'Sin nombre'),
   precioBase: toNumber(service.precioBase ?? service.price ?? service.precio_base),
+  activo: service.activo ?? service.active ?? true,
   createdAt: service.createdAt ?? service.created_at,
   updatedAt: service.updatedAt ?? service.updated_at
 })
@@ -386,21 +396,22 @@ export async function signUp(email: string, password: string, name?: string): Pr
 export async function getBootstrap(): Promise<BootstrapData> {
   const client = getSupabase()
   const [barbersRes, servicesRes, cutsRes, expensesRes] = await Promise.all([
-    client.from('barbers').select('*'),
-    client.from('services').select('*'),
-    client.from('cuts').select('*'),
-    client.from('expenses').select('*')
+    client.from('barbers').select('*').order('name', { ascending: true }),
+    client.from('services').select('*').order('name', { ascending: true }),
+    client.from('cuts').select('*').order('created_at', { ascending: false }),
+    client.from('expenses').select('*').order('created_at', { ascending: false })
   ])
 
   const firstError = barbersRes.error ?? servicesRes.error ?? cutsRes.error ?? expensesRes.error
-  if (firstError) throw new Error(firstError.message)
+  assertSupabase({ error: firstError })
 
   const allBarbers = (barbersRes.data ?? []).map(normalizeBarber)
   const barbers = allBarbers.filter((barber) => barber.activo)
-  const services = (servicesRes.data ?? []).map(normalizeService)
+  const allServices = (servicesRes.data ?? []).map(normalizeService)
+  const services = allServices.filter((service) => service.activo)
   const expenses = sortByDateDesc((expensesRes.data ?? []).map(normalizeExpense))
   const barbersById = new Map(allBarbers.map((barber) => [barber.id, barber]))
-  const servicesById = new Map(services.map((service) => [service.id, service]))
+  const servicesById = new Map(allServices.map((service) => [service.id, service]))
   const cuts = sortByDateDesc(
     (cutsRes.data ?? []).map((cut) => normalizeCut(cut, barbersById, servicesById))
   )
@@ -440,12 +451,31 @@ export async function deleteBarber(id: number) {
 }
 
 export async function createCut(data: any) {
-  const res = await getSupabase()
+  const client = getSupabase()
+  const serviceId = data.serviceId ?? data.service_id
+  let serviceName = data.serviceName ?? data.service_name_snapshot ?? null
+  let servicePrice = data.servicePrice ?? data.service_price_snapshot ?? null
+
+  if (!serviceName || servicePrice === null || servicePrice === undefined) {
+    const serviceRes = await client
+      .from('services')
+      .select('name, price')
+      .eq('id', serviceId)
+      .maybeSingle()
+
+    assertSupabase(serviceRes)
+    serviceName = serviceName ?? serviceRes.data?.name ?? null
+    servicePrice = servicePrice ?? serviceRes.data?.price ?? null
+  }
+
+  const res = await client
     .from('cuts')
     .insert([{
       barber_id: data.barberId ?? data.barber_id,
-      service_id: data.serviceId ?? data.service_id,
+      service_id: serviceId,
       price: data.monto ?? data.price,
+      service_name_snapshot: serviceName,
+      service_price_snapshot: servicePrice ?? data.monto ?? data.price,
       payment_method: data.metodoPago ?? data.payment_method,
       observation: data.observacion ?? data.observation
     }])
@@ -461,7 +491,8 @@ export async function createService(data: any) {
     .from('services')
     .insert([{
       name: data.nombre ?? data.name,
-      price: data.precioBase ?? data.price
+      price: data.precioBase ?? data.price,
+      active: true
     }])
     .select()
     .single()
