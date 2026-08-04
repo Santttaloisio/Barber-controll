@@ -9,8 +9,8 @@ import {
   deleteBarber,
   deleteExpense,
   getBootstrap,
+  getCurrentUser,
   getStoredUser,
-  getToken,
   login,
   updateService
 } from './api/api'
@@ -413,11 +413,15 @@ const setupEvents = () => {
 }
 
 const init = async () => {
-  if (!getToken()) {
+  const user = await getCurrentUser()
+
+  if (!user) {
     state.user = null
     renderLogin()
     return
   }
+
+  state.user = user
 
   if (app) app.innerHTML = `<h2 style="padding:20px">Cargando...</h2>`
 

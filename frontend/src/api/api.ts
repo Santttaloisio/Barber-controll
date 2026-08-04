@@ -1,3 +1,4 @@
+import { supabase, supabaseConfigError } from '../lib/supabase'
 import type {
   Barber,
   BootstrapData,
@@ -6,76 +7,104 @@ import type {
   ExpenseCategoryReport,
   LoginResponse,
   MonthReport,
-  Service
+  Service,
+  User
 } from '../types'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
-
-const TOKEN_KEY = 'barber-control-token'
 const USER_KEY = 'barber-control-user'
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
+const getSupabase = () => {
+  if (!supabase) {
+    throw new Error(supabaseConfigError ?? 'Supabase no esta configurado')
+  }
+
+  return supabase
+}
+
+const toNumber = (value: unknown) => {
+  const number = Number(value ?? 0)
+  return Number.isFinite(number) ? number : 0
+}
+
+const toText = (value: unknown, fallback: string) => {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+const normalizeDate = (...values: unknown[]) => {
+  const value = values.find((item) => typeof item === 'string' && item)
+  return typeof value === 'string' ? value : new Date().toISOString()
+}
+
+const mapAuthUser = (user: any): User => ({
+  username: user?.email ?? '',
+  name: user?.user_metadata?.name ?? user?.user_metadata?.full_name ?? user?.email ?? 'Usuario'
+})
+
+export const getToken = () => {
+  const authStorage = Object.keys(localStorage).find((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+  if (!authStorage) return null
+
+  const session = JSON.parse(localStorage.getItem(authStorage) ?? 'null')
+  return session?.access_token ?? null
+}
 
 export const getStoredUser = () => {
   const user = localStorage.getItem(USER_KEY)
   return user ? JSON.parse(user) : null
 }
 
-export const setSession = (session: LoginResponse) => {
-  localStorage.setItem(TOKEN_KEY, session.token)
-  localStorage.setItem(USER_KEY, JSON.stringify(session.user))
+export const getCurrentUser = async () => {
+  if (!supabase) {
+    localStorage.removeItem(USER_KEY)
+    return null
+  }
+
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user) {
+    localStorage.removeItem(USER_KEY)
+    return null
+  }
+
+  const user = mapAuthUser(data.user)
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  return user
 }
 
 export const clearSession = () => {
-  localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+  void supabase?.auth.signOut()
 }
 
-const request = async (url: string, options?: RequestInit) => {
-  const token = getToken()
-  const headers = new Headers(options?.headers)
-
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-
-  const res = await fetch(url, {
-    ...options,
-    headers
-  })
-
-  const data = await res.json().catch(() => null)
-
-  if (res.status === 401) clearSession()
-
-  if (!res.ok) {
-    throw new Error(data?.message ?? 'Error de API')
-  }
-
-  return data
+const assertSupabase = ({ error }: { error: any }) => {
+  if (error) throw new Error(error.message ?? 'Error de Supabase')
 }
 
 const normalizeBarber = (barber: any): Barber => ({
-  ...barber,
-  nombre: barber.nombre ?? barber.name ?? 'Sin nombre',
+  id: toNumber(barber.id),
+  nombre: toText(barber.nombre ?? barber.name, 'Sin nombre'),
   activo: barber.activo ?? barber.active ?? true,
   createdAt: barber.createdAt ?? barber.created_at,
   updatedAt: barber.updatedAt ?? barber.updated_at
 })
 
 const normalizeService = (service: any): Service => ({
-  ...service,
-  nombre: service.nombre ?? service.name ?? 'Sin nombre',
-  precioBase: Number(service.precioBase ?? service.price ?? service.precio_base ?? 0),
+  id: toNumber(service.id),
+  nombre: toText(service.nombre ?? service.name, 'Sin nombre'),
+  precioBase: toNumber(service.precioBase ?? service.price ?? service.precio_base),
   createdAt: service.createdAt ?? service.created_at,
   updatedAt: service.updatedAt ?? service.updated_at
 })
 
 const normalizeExpense = (expense: any): Expense => ({
-  ...expense,
-  categoria: expense.categoria ?? expense.category ?? 'Gastos varios',
-  descripcion: expense.descripcion ?? expense.description ?? 'Sin descripcion',
-  monto: Number(expense.monto ?? expense.amount ?? 0),
-  metodoPago: expense.metodoPago ?? expense.paymentMethod ?? expense.payment_method ?? 'Sin metodo',
-  fecha: expense.fecha ?? expense.date ?? expense.created_at ?? new Date().toISOString(),
+  id: toNumber(expense.id),
+  categoria: toText(expense.categoria ?? expense.category, 'Gastos varios') as Expense['categoria'],
+  descripcion: toText(expense.descripcion ?? expense.description, 'Sin descripcion'),
+  monto: toNumber(expense.monto ?? expense.amount),
+  metodoPago: toText(
+    expense.metodoPago ?? expense.paymentMethod ?? expense.payment_method,
+    'Sin metodo'
+  ),
+  fecha: normalizeDate(expense.fecha, expense.date, expense.created_at),
   observacion: expense.observacion ?? expense.observation ?? null,
   createdAt: expense.createdAt ?? expense.created_at,
   updatedAt: expense.updatedAt ?? expense.updated_at
@@ -88,17 +117,20 @@ const normalizeCut = (
 ): Cut => {
   const barber = cut.Barber ?? cut.barber
   const service = cut.Service ?? cut.service
-  const barberId = Number(cut.barberId ?? cut.barber_id ?? 0)
-  const serviceId = Number(cut.serviceId ?? cut.service_id ?? 0)
+  const barberId = toNumber(cut.barberId ?? cut.barber_id)
+  const serviceId = toNumber(cut.serviceId ?? cut.service_id)
 
   return {
-    ...cut,
+    id: toNumber(cut.id),
     barberId,
     serviceId,
-    monto: Number(cut.monto ?? cut.amount ?? cut.price ?? 0),
-    metodoPago: cut.metodoPago ?? cut.paymentMethod ?? cut.payment_method ?? 'Sin metodo',
+    monto: toNumber(cut.monto ?? cut.amount ?? cut.price),
+    metodoPago: toText(
+      cut.metodoPago ?? cut.paymentMethod ?? cut.payment_method,
+      'Sin metodo'
+    ),
     observacion: cut.observacion ?? cut.observation ?? null,
-    fecha: cut.fecha ?? cut.date ?? cut.created_at ?? new Date().toISOString(),
+    fecha: normalizeDate(cut.fecha, cut.date, cut.created_at),
     Barber: barber ? normalizeBarber(barber) : barbersById.get(barberId),
     Service: service ? normalizeService(service) : servicesById.get(serviceId),
     createdAt: cut.createdAt ?? cut.created_at,
@@ -134,9 +166,11 @@ const formatDateKey = (date: Date) => {
   return `${year}-${month}-${day}`
 }
 
-const sumCuts = (cuts: Cut[]) => {
-  return cuts.reduce((total, cut) => total + Number(cut.monto || 0), 0)
+const sortByDateDesc = <T extends { fecha: string }>(items: T[]) => {
+  return [...items].sort((a, b) => getDate(b.fecha).getTime() - getDate(a.fecha).getTime())
 }
+
+const sumCuts = (cuts: Cut[]) => cuts.reduce((total, cut) => total + Number(cut.monto || 0), 0)
 
 const sumExpenses = (expenses: Expense[]) => {
   return expenses.reduce((total, expense) => total + Number(expense.monto || 0), 0)
@@ -307,30 +341,69 @@ const buildDashboard = (cuts: Cut[], expenses: Expense[]) => {
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+  const client = getSupabase()
+  const { data, error } = await client.auth.signInWithPassword({
+    email: username,
+    password
   })
 
-  const data = await res.json().catch(() => null)
-
-  if (!res.ok) {
-    throw new Error(data?.message ?? 'No se pudo iniciar sesion')
+  if (error || !data.session || !data.user) {
+    throw new Error(error?.message ?? 'No se pudo iniciar sesion')
   }
 
-  setSession(data)
-  return data
+  const user = mapAuthUser(data.user)
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+
+  return {
+    token: data.session.access_token,
+    user
+  }
+}
+
+export async function signUp(email: string, password: string, name?: string): Promise<LoginResponse> {
+  const client = getSupabase()
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name }
+    }
+  })
+
+  if (error || !data.user) {
+    throw new Error(error?.message ?? 'No se pudo crear la cuenta')
+  }
+
+  const user = mapAuthUser(data.user)
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+
+  return {
+    token: data.session?.access_token ?? '',
+    user
+  }
 }
 
 export async function getBootstrap(): Promise<BootstrapData> {
-  const data = await request(`${BASE_URL}/bootstrap`)
-  const barbers = (data.barbers ?? []).map(normalizeBarber)
-  const services = (data.services ?? []).map(normalizeService)
-  const barbersById = new Map(barbers.map((barber) => [barber.id, barber]))
+  const client = getSupabase()
+  const [barbersRes, servicesRes, cutsRes, expensesRes] = await Promise.all([
+    client.from('barbers').select('*'),
+    client.from('services').select('*'),
+    client.from('cuts').select('*'),
+    client.from('expenses').select('*')
+  ])
+
+  const firstError = barbersRes.error ?? servicesRes.error ?? cutsRes.error ?? expensesRes.error
+  if (firstError) throw new Error(firstError.message)
+
+  const allBarbers = (barbersRes.data ?? []).map(normalizeBarber)
+  const barbers = allBarbers.filter((barber) => barber.activo)
+  const services = (servicesRes.data ?? []).map(normalizeService)
+  const expenses = sortByDateDesc((expensesRes.data ?? []).map(normalizeExpense))
+  const barbersById = new Map(allBarbers.map((barber) => [barber.id, barber]))
   const servicesById = new Map(services.map((service) => [service.id, service]))
-  const cuts = (data.cuts ?? []).map((cut: any) => normalizeCut(cut, barbersById, servicesById))
-  const expenses = (data.expenses ?? []).map(normalizeExpense)
+  const cuts = sortByDateDesc(
+    (cutsRes.data ?? []).map((cut) => normalizeCut(cut, barbersById, servicesById))
+  )
 
   return {
     dashboard: buildDashboard(cuts, expenses),
@@ -344,74 +417,97 @@ export async function getBootstrap(): Promise<BootstrapData> {
 }
 
 export async function createBarber(data: any) {
-  return request(`${BASE_URL}/barbers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: data.nombre ?? data.name
-    })
-  })
+  const res = await getSupabase()
+    .from('barbers')
+    .insert([{ name: data.nombre ?? data.name, active: true }])
+    .select()
+    .single()
+
+  assertSupabase(res)
+  return res.data
 }
 
 export async function deleteBarber(id: number) {
-  return request(`${BASE_URL}/barbers/${id}`, {
-    method: 'DELETE'
-  })
+  const res = await getSupabase()
+    .from('barbers')
+    .update({ active: false })
+    .eq('id', id)
+    .select()
+    .single()
+
+  assertSupabase(res)
+  return res.data
 }
 
 export async function createCut(data: any) {
-  return request(`${BASE_URL}/cuts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const res = await getSupabase()
+    .from('cuts')
+    .insert([{
       barber_id: data.barberId ?? data.barber_id,
       service_id: data.serviceId ?? data.service_id,
       price: data.monto ?? data.price,
       payment_method: data.metodoPago ?? data.payment_method,
       observation: data.observacion ?? data.observation
-    })
-  })
+    }])
+    .select()
+    .single()
+
+  assertSupabase(res)
+  return res.data
 }
 
 export async function createService(data: any) {
-  return request(`${BASE_URL}/services`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const res = await getSupabase()
+    .from('services')
+    .insert([{
       name: data.nombre ?? data.name,
       price: data.precioBase ?? data.price
-    })
-  })
+    }])
+    .select()
+    .single()
+
+  assertSupabase(res)
+  return res.data
 }
 
 export async function updateService(id: number, data: any) {
-  return request(`${BASE_URL}/services/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const res = await getSupabase()
+    .from('services')
+    .update({
       name: data.nombre ?? data.name,
       price: data.precioBase ?? data.price
     })
-  })
+    .eq('id', id)
+    .select()
+    .single()
+
+  assertSupabase(res)
+  return res.data
 }
 
 export async function createExpense(data: any) {
-  return request(`${BASE_URL}/expenses`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const res = await getSupabase()
+    .from('expenses')
+    .insert([{
       category: data.categoria ?? data.category,
       description: data.descripcion ?? data.description,
       amount: data.monto ?? data.amount,
-      paymentMethod: data.metodoPago ?? data.paymentMethod,
+      payment_method: data.metodoPago ?? data.paymentMethod,
       date: data.fecha ?? data.date,
       observation: data.observacion ?? data.observation
-    })
-  })
+    }])
+    .select()
+    .single()
+
+  assertSupabase(res)
+  return res.data
 }
 
 export async function deleteExpense(id: number) {
-  return request(`${BASE_URL}/expenses/${id}`, {
-    method: 'DELETE'
-  })
+  const res = await getSupabase()
+    .from('expenses')
+    .delete()
+    .eq('id', id)
+
+  assertSupabase(res)
 }
